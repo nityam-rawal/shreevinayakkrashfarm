@@ -10,14 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StockRouteImport } from './routes/stock'
+import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CashbookRouteImport } from './routes/cashbook'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PartiesIndexRouteImport } from './routes/parties.index'
 import { Route as PartiesIdRouteImport } from './routes/parties.$id'
+import { Route as InvoiceNewRouteImport } from './routes/invoice.new'
+import { Route as InvoiceIdRouteImport } from './routes/invoice.$id'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
 
 const StockRoute = StockRouteImport.update({
   id: '/stock',
   path: '/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CashbookRoute = CashbookRouteImport.update({
@@ -40,18 +49,41 @@ const PartiesIdRoute = PartiesIdRouteImport.update({
   path: '/parties/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InvoiceNewRoute = InvoiceNewRouteImport.update({
+  id: '/invoice/new',
+  path: '/invoice/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvoiceIdRoute = InvoiceIdRouteImport.update({
+  id: '/invoice/$id',
+  path: '/invoice/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cashbook': typeof CashbookRoute
+  '/chat': typeof ChatRoute
   '/stock': typeof StockRoute
+  '/api/chat': typeof ApiChatRoute
+  '/invoice/$id': typeof InvoiceIdRoute
+  '/invoice/new': typeof InvoiceNewRoute
   '/parties/$id': typeof PartiesIdRoute
   '/parties/': typeof PartiesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cashbook': typeof CashbookRoute
+  '/chat': typeof ChatRoute
   '/stock': typeof StockRoute
+  '/api/chat': typeof ApiChatRoute
+  '/invoice/$id': typeof InvoiceIdRoute
+  '/invoice/new': typeof InvoiceNewRoute
   '/parties/$id': typeof PartiesIdRoute
   '/parties': typeof PartiesIndexRoute
 }
@@ -59,22 +91,58 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/cashbook': typeof CashbookRoute
+  '/chat': typeof ChatRoute
   '/stock': typeof StockRoute
+  '/api/chat': typeof ApiChatRoute
+  '/invoice/$id': typeof InvoiceIdRoute
+  '/invoice/new': typeof InvoiceNewRoute
   '/parties/$id': typeof PartiesIdRoute
   '/parties/': typeof PartiesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/cashbook' | '/stock' | '/parties/$id' | '/parties/'
+  fullPaths:
+    | '/'
+    | '/cashbook'
+    | '/chat'
+    | '/stock'
+    | '/api/chat'
+    | '/invoice/$id'
+    | '/invoice/new'
+    | '/parties/$id'
+    | '/parties/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cashbook' | '/stock' | '/parties/$id' | '/parties'
-  id: '__root__' | '/' | '/cashbook' | '/stock' | '/parties/$id' | '/parties/'
+  to:
+    | '/'
+    | '/cashbook'
+    | '/chat'
+    | '/stock'
+    | '/api/chat'
+    | '/invoice/$id'
+    | '/invoice/new'
+    | '/parties/$id'
+    | '/parties'
+  id:
+    | '__root__'
+    | '/'
+    | '/cashbook'
+    | '/chat'
+    | '/stock'
+    | '/api/chat'
+    | '/invoice/$id'
+    | '/invoice/new'
+    | '/parties/$id'
+    | '/parties/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CashbookRoute: typeof CashbookRoute
+  ChatRoute: typeof ChatRoute
   StockRoute: typeof StockRoute
+  ApiChatRoute: typeof ApiChatRoute
+  InvoiceIdRoute: typeof InvoiceIdRoute
+  InvoiceNewRoute: typeof InvoiceNewRoute
   PartiesIdRoute: typeof PartiesIdRoute
   PartiesIndexRoute: typeof PartiesIndexRoute
 }
@@ -86,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/stock'
       fullPath: '/stock'
       preLoaderRoute: typeof StockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cashbook': {
@@ -116,16 +191,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PartiesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invoice/new': {
+      id: '/invoice/new'
+      path: '/invoice/new'
+      fullPath: '/invoice/new'
+      preLoaderRoute: typeof InvoiceNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invoice/$id': {
+      id: '/invoice/$id'
+      path: '/invoice/$id'
+      fullPath: '/invoice/$id'
+      preLoaderRoute: typeof InvoiceIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CashbookRoute: CashbookRoute,
+  ChatRoute: ChatRoute,
   StockRoute: StockRoute,
+  ApiChatRoute: ApiChatRoute,
+  InvoiceIdRoute: InvoiceIdRoute,
+  InvoiceNewRoute: InvoiceNewRoute,
   PartiesIdRoute: PartiesIdRoute,
   PartiesIndexRoute: PartiesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
