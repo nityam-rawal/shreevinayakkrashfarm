@@ -87,19 +87,21 @@ function Stock() {
 }
 
 function ItemForm({ kind, id, onDone }: { kind: ItemKind; id: number | null; onDone: () => void }) {
-  const existing = useLiveQuery(() => (id ? db.items.get(id) : Promise.resolve(undefined)), [id]);
-  const [name, setName] = useState(existing?.name ?? "");
-  const [unit, setUnit] = useState(existing?.unit ?? (kind === "stock" ? "Brass" : "Trip"));
-  const [rate, setRate] = useState(existing?.rate ? String(existing.rate) : "");
-  const [category, setCategory] = useState(existing?.category ?? "");
+  const existing = useLiveQuery(async () => (id ? await db.items.get(id) : undefined), [id]);
+  const [name, setName] = useState("");
+  const [unit, setUnit] = useState(kind === "stock" ? "Brass" : "Trip");
+  const [rate, setRate] = useState("");
+  const [category, setCategory] = useState("");
+  const [hydrated, setHydrated] = useState(false);
 
-  // Sync when existing loads
-  if (existing && !name) {
+  if (existing && !hydrated) {
     setName(existing.name);
     setUnit(existing.unit);
     setRate(String(existing.rate));
     setCategory(existing.category ?? "");
+    setHydrated(true);
   }
+
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
