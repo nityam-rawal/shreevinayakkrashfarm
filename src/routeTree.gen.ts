@@ -9,38 +9,92 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StockRouteImport } from './routes/stock'
+import { Route as CashbookRouteImport } from './routes/cashbook'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PartiesIndexRouteImport } from './routes/parties.index'
+import { Route as PartiesIdRouteImport } from './routes/parties.$id'
 
+const StockRoute = StockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CashbookRoute = CashbookRouteImport.update({
+  id: '/cashbook',
+  path: '/cashbook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PartiesIndexRoute = PartiesIndexRouteImport.update({
+  id: '/parties/',
+  path: '/parties/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartiesIdRoute = PartiesIdRouteImport.update({
+  id: '/parties/$id',
+  path: '/parties/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cashbook': typeof CashbookRoute
+  '/stock': typeof StockRoute
+  '/parties/$id': typeof PartiesIdRoute
+  '/parties/': typeof PartiesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cashbook': typeof CashbookRoute
+  '/stock': typeof StockRoute
+  '/parties/$id': typeof PartiesIdRoute
+  '/parties': typeof PartiesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cashbook': typeof CashbookRoute
+  '/stock': typeof StockRoute
+  '/parties/$id': typeof PartiesIdRoute
+  '/parties/': typeof PartiesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/cashbook' | '/stock' | '/parties/$id' | '/parties/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/cashbook' | '/stock' | '/parties/$id' | '/parties'
+  id: '__root__' | '/' | '/cashbook' | '/stock' | '/parties/$id' | '/parties/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CashbookRoute: typeof CashbookRoute
+  StockRoute: typeof StockRoute
+  PartiesIdRoute: typeof PartiesIdRoute
+  PartiesIndexRoute: typeof PartiesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/stock': {
+      id: '/stock'
+      path: '/stock'
+      fullPath: '/stock'
+      preLoaderRoute: typeof StockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cashbook': {
+      id: '/cashbook'
+      path: '/cashbook'
+      fullPath: '/cashbook'
+      preLoaderRoute: typeof CashbookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +102,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/parties/': {
+      id: '/parties/'
+      path: '/parties'
+      fullPath: '/parties/'
+      preLoaderRoute: typeof PartiesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parties/$id': {
+      id: '/parties/$id'
+      path: '/parties/$id'
+      fullPath: '/parties/$id'
+      preLoaderRoute: typeof PartiesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CashbookRoute: CashbookRoute,
+  StockRoute: StockRoute,
+  PartiesIdRoute: PartiesIdRoute,
+  PartiesIndexRoute: PartiesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
