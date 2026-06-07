@@ -71,7 +71,9 @@ function NewInvoice() {
       await db.ledger.add({ partyId, date, type: "payment", debit: 0, credit: Number(paid), note: `Paid for ${number}`, invoiceId: id, createdAt: Date.now() });
       await db.cash.add({ date, type: "income", amount: Number(paid), category: "Sales", note: `${number}`, partyId, createdAt: Date.now() });
     }
-    toast.success(`${number} ban gaya`);
+    const stockUpdates = await adjustStockForLines(cleanLines, -1);
+    const low = stockUpdates.filter((s) => s.low).map((s) => `${s.name}: ${s.newStock}`).join(", ");
+    toast.success(`${number} ban gaya${low ? ` • Low stock: ${low}` : ""}`);
     navigate({ to: "/invoice/$id", params: { id: String(id) } });
   }
 
