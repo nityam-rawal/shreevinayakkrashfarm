@@ -49,6 +49,8 @@ export interface Item {
   unit: string; // "Bag", "Brass", "Trip", "Hour", "Day"
   rate: number;
   category?: string; // "Reti", "Patthar", "Cement", "Dumper", "JCB"
+  stock?: number; // current quantity in hand (only meaningful for kind="stock")
+  lowStockAt?: number; // threshold for low-stock warning
   createdAt: number;
 }
 
@@ -117,6 +119,31 @@ export async function nextInvoiceNumber(): Promise<string> {
   const seq = (last?.id ?? 0) + 1;
   const yr = new Date().getFullYear();
   return `SVKF/${yr}/${String(seq).padStart(4, "0")}`;
+}
+
+/**
+ * Deduct (or add back) stock for a set of invoice lines.
+ * Matches items by name (case-insensitive) and only adjusts items where kind === "stock".
+ * `sign` = -1 for sale (deduct), +1 for reversal / stock-in.
+ */
+export async function adjustStockForLines(
+  lines: { name: string; qty: number }[],
+  sign: 1 | -1 = -1,
+): Promise<{ name: string; newStock: number; low: boolean }[]> {
+  const out: { name: string; newStock: number; low: boolean }[] = [];
+  for (const l of lines) {
+    if (!l.name || !l.qty) continue;
+    const it = await db.items.where("name").equalsIgnoreCase(l.name).first();
+    if (!it || it.kind !== "stock" || it.id == null) continue;
+    const newStock = (it.stock ?? 0) + sign * l.qty;
+    await db.items.update(it.id, { stock: newStock });
+    out.push({
+      name: it.name,
+      newStock,
+      low: it.lowStockAt != null && newStock <= it.lowStockAt,
+    });
+  }
+  return out;
 }
 
 // Seed initial items so the app feels usable on first launch.

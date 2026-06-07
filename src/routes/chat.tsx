@@ -3,7 +3,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, nextInvoiceNumber } from "@/lib/db";
+import { db, nextInvoiceNumber, partyBalance, cashOnHand, adjustStockForLines } from "@/lib/db";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,20 +36,26 @@ function getText(message: UIMessage): string {
 }
 
 function ChatPage() {
-  const parties = useLiveQuery(() => db.parties.toArray(), [], []);
-  const items = useLiveQuery(() => db.items.toArray(), [], []);
+  const ctxData = useLiveQuery(async () => {
+    const ps = await db.parties.toArray();
+    const its = await db.items.toArray();
+    const withBal = await Promise.all(
+      ps.map(async (p) => ({ id: p.id!, name: p.name, type: p.type, balance: await partyBalance(p.id!) })),
+    );
+    const coh = await cashOnHand();
+    return {
+      parties: withBal,
+      items: its.map((i) => ({ id: i.id!, name: i.name, unit: i.unit, rate: i.rate, kind: i.kind, stock: i.stock })),
+      cashOnHand: coh,
+    };
+  }, [], { parties: [], items: [], cashOnHand: 0 });
 
   const transport = useMemo(
     () => new DefaultChatTransport({
       api: "/api/chat",
-      body: () => ({
-        context: {
-          parties: parties.map((p) => ({ id: p.id!, name: p.name, type: p.type })),
-          items: items.map((i) => ({ id: i.id!, name: i.name, unit: i.unit, rate: i.rate, kind: i.kind })),
-        },
-      }),
+      body: () => ({ context: ctxData }),
     }),
-    [parties, items],
+    [ctxData],
   );
 
   const { messages, sendMessage, status } = useChat({
@@ -188,7 +194,9 @@ function ActionCard({ action }: { action: Action }) {
           await db.ledger.add({ partyId: party!.id!, date, type: "payment", debit: 0, credit: d.paid, note: `Paid ${number}`, invoiceId: invId, createdAt: Date.now() });
           await db.cash.add({ date, type: "income", amount: d.paid, category: "Sales", note: number, partyId: party!.id!, createdAt: Date.now() });
         }
-        toast.success(`Bill ${number} ban gaya`);
+        const stockUpdates = await adjustStockForLines(lines, -1);
+        const lowMsg = stockUpdates.filter((s) => s.low).map((s) => `${s.name}: ${s.newStock}`).join(", ");
+        toast.success(`Bill ${number} ban gaya${lowMsg ? ` • Low stock: ${lowMsg}` : ""}`);
       } else if (action.action === "add_cash") {
         const d = action.data;
         await db.cash.add({
