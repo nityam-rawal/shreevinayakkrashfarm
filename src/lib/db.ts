@@ -121,6 +121,31 @@ export async function nextInvoiceNumber(): Promise<string> {
   return `SVKF/${yr}/${String(seq).padStart(4, "0")}`;
 }
 
+/**
+ * Deduct (or add back) stock for a set of invoice lines.
+ * Matches items by name (case-insensitive) and only adjusts items where kind === "stock".
+ * `sign` = -1 for sale (deduct), +1 for reversal / stock-in.
+ */
+export async function adjustStockForLines(
+  lines: { name: string; qty: number }[],
+  sign: 1 | -1 = -1,
+): Promise<{ name: string; newStock: number; low: boolean }[]> {
+  const out: { name: string; newStock: number; low: boolean }[] = [];
+  for (const l of lines) {
+    if (!l.name || !l.qty) continue;
+    const it = await db.items.where("name").equalsIgnoreCase(l.name).first();
+    if (!it || it.kind !== "stock" || it.id == null) continue;
+    const newStock = (it.stock ?? 0) + sign * l.qty;
+    await db.items.update(it.id, { stock: newStock });
+    out.push({
+      name: it.name,
+      newStock,
+      low: it.lowStockAt != null && newStock <= it.lowStockAt,
+    });
+  }
+  return out;
+}
+
 // Seed initial items so the app feels usable on first launch.
 export async function seedIfEmpty() {
   const count = await db.items.count();
