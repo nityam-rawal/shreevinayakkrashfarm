@@ -49,6 +49,8 @@ export interface Item {
   unit: string; // "Bag", "Brass", "Trip", "Hour", "Day"
   rate: number;
   category?: string; // "Reti", "Patthar", "Cement", "Dumper", "JCB"
+  stock?: number; // current quantity in hand (only meaningful for kind="stock")
+  lowStockAt?: number; // threshold for low-stock warning
   createdAt: number;
 }
 
