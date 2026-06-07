@@ -1,7 +1,9 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Users, BookOpen, Boxes, FileText, Sparkles } from "lucide-react";
+import { Home, Users, BookOpen, Boxes, FileText, Sparkles, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { hasPin, lock } from "@/lib/lock";
+
 
 const nav = [
   { to: "/", label: "Dashboard", icon: Home },
@@ -27,8 +29,20 @@ export function AppShell({ children, title, action }: { children: ReactNode; tit
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Krashi Farm</div>
             </div>
           </Link>
-          {action}
+          <div className="flex items-center gap-1">
+            {action}
+            {hasPin() && (
+              <button
+                onClick={() => { lock(); location.reload(); }}
+                className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+                title="Lock app"
+              >
+                <Lock className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
+
         {title && (
           <div className="mx-auto max-w-2xl px-4 pb-3">
             <h1 className="font-display text-2xl font-bold">{title}</h1>
