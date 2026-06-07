@@ -36,8 +36,6 @@ function getText(message: UIMessage): string {
 }
 
 function ChatPage() {
-  const parties = useLiveQuery(() => db.parties.toArray(), [], []);
-  const items = useLiveQuery(() => db.items.toArray(), [], []);
   const ctxData = useLiveQuery(async () => {
     const ps = await db.parties.toArray();
     const its = await db.items.toArray();
