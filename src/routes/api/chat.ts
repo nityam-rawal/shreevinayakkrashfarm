@@ -5,8 +5,9 @@ import { convertToModelMessages, streamText, type UIMessage } from "ai";
 type ChatRequestBody = {
   messages?: unknown;
   context?: {
-    parties?: { id: number; name: string; type: string }[];
-    items?: { id: number; name: string; unit: string; rate: number; kind: string }[];
+    parties?: { id: number; name: string; type: string; balance: number }[];
+    items?: { id: number; name: string; unit: string; rate: number; kind: string; stock?: number }[];
+    cashOnHand?: number;
   };
 };
 
@@ -24,11 +25,19 @@ export const Route = createFileRoute("/api/chat")({
 
         const ctx = body.context ?? {};
         const partyList = (ctx.parties ?? [])
-          .map((p) => `- ${p.name} (${p.type}) [id:${p.id}]`)
+          .map((p) => {
+            const bal = p.balance ?? 0;
+            const tag = bal === 0 ? "settled" : bal > 0 ? `lena ₹${Math.round(bal)}` : `dena ₹${Math.round(-bal)}`;
+            return `- ${p.name} (${p.type}) [id:${p.id}] — ${tag}`;
+          })
           .join("\n") || "(koi party nahi)";
         const itemList = (ctx.items ?? [])
-          .map((i) => `- ${i.name} — ₹${i.rate}/${i.unit} (${i.kind}) [id:${i.id}]`)
+          .map((i) => {
+            const s = i.kind === "stock" ? ` | stock: ${i.stock ?? 0} ${i.unit}` : "";
+            return `- ${i.name} — ₹${i.rate}/${i.unit} (${i.kind})${s} [id:${i.id}]`;
+          })
           .join("\n") || "(koi item nahi)";
+        const cashLine = ctx.cashOnHand != null ? `\nCash on hand: ₹${Math.round(ctx.cashOnHand)}` : "";
 
         const system = `Tum "Vinayak AI" ho — Shree Vinayak Krashi Farm (construction material supplier) ke liye Hinglish/Hindi me baat karne wala smart accountant assistant.
 
