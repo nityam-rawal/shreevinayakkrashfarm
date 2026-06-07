@@ -7,9 +7,10 @@ import { db, nextInvoiceNumber, partyBalance, cashOnHand, adjustStockForLines } 
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Sparkles, CheckCircle2, Loader2 } from "lucide-react";
+import { Send, Sparkles, CheckCircle2, Loader2, Mic, MicOff, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { todayISO, fmtINR } from "@/lib/format";
+import { ocrImage } from "@/lib/ocr";
 
 export const Route = createFileRoute("/chat")({
   head: () => ({ meta: [{ title: "AI Assistant" }] }),
@@ -21,18 +22,67 @@ type Action =
   | { action: "add_cash"; data: { date?: string; type: "income" | "expense"; amount: number; category: string; note?: string } }
   | { action: "add_ledger"; data: { partyName: string; type: "payment" | "invoice" | "adjustment"; amount: number; note?: string } };
 
-function extractAction(text: string): Action | null {
+function extractActions(text: string): Action[] {
   const m = text.match(/```json\s*([\s\S]*?)```/i);
-  if (!m) return null;
+  if (!m) return [];
   try {
     const j = JSON.parse(m[1]);
-    if (j && typeof j === "object" && "action" in j) return j as Action;
+    if (Array.isArray(j?.actions)) return j.actions as Action[];
+    if (j && typeof j === "object" && "action" in j) return [j as Action];
   } catch { /* ignore */ }
-  return null;
+  return [];
 }
 
 function getText(message: UIMessage): string {
   return message.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
+}
+
+async function applyAction(a: Action): Promise<string> {
+  if (a.action === "create_invoice") {
+    const d = a.data;
+    let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
+    if (!party) {
+      const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
+      party = await db.parties.get(id);
+    }
+    const lines = d.lines.map((l) => ({ ...l, amount: l.qty * l.rate }));
+    const subtotal = lines.reduce((acc, l) => acc + l.amount, 0);
+    const total = subtotal;
+    const number = await nextInvoiceNumber();
+    const date = todayISO();
+    const invId = await db.invoices.add({
+      number, partyId: party!.id!, date, lines,
+      subtotal, discount: 0, total, paid: d.paid ?? 0,
+      notes: d.notes, createdAt: Date.now(),
+    });
+    await db.ledger.add({ partyId: party!.id!, date, type: "invoice", debit: total, credit: 0, note: `Bill ${number}`, invoiceId: invId, createdAt: Date.now() });
+    if (d.paid && d.paid > 0) {
+      await db.ledger.add({ partyId: party!.id!, date, type: "payment", debit: 0, credit: d.paid, note: `Paid ${number}`, invoiceId: invId, createdAt: Date.now() });
+      await db.cash.add({ date, type: "income", amount: d.paid, category: "Sales", note: number, partyId: party!.id!, createdAt: Date.now() });
+    }
+    const stockUpdates = await adjustStockForLines(lines, -1);
+    const low = stockUpdates.filter((s) => s.low).map((s) => `${s.name}:${s.newStock}`).join(",");
+    return `Bill ${number}${low ? ` (low: ${low})` : ""}`;
+  }
+  if (a.action === "add_cash") {
+    const d = a.data;
+    await db.cash.add({ date: d.date || todayISO(), type: d.type, amount: d.amount, category: d.category, note: d.note, createdAt: Date.now() });
+    return `Cash ${d.type} ${fmtINR(d.amount)}`;
+  }
+  // add_ledger
+  const d = a.data;
+  let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
+  if (!party) {
+    const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
+    party = await db.parties.get(id);
+  }
+  const debit = d.type === "invoice" || (d.type === "adjustment" && d.amount > 0) ? Math.abs(d.amount) : 0;
+  const credit = d.type === "payment" || (d.type === "adjustment" && d.amount < 0) ? Math.abs(d.amount) : 0;
+  await db.ledger.add({ partyId: party!.id!, date: todayISO(), type: d.type, debit, credit, note: d.note, createdAt: Date.now() });
+  if (d.type === "payment") {
+    await db.cash.add({ date: todayISO(), type: "income", amount: Math.abs(d.amount), category: "Party Payment", note: d.partyName, partyId: party!.id!, createdAt: Date.now() });
+  }
+  return `Khata ${d.partyName}`;
 }
 
 function ChatPage() {
@@ -64,13 +114,15 @@ function ChatPage() {
   });
 
   const [input, setInput] = useState("");
+  const [listening, setListening] = useState(false);
+  const [ocrBusy, setOcrBusy] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const recRef = useRef<unknown>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isLoading = status === "submitted" || status === "streaming";
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
@@ -84,11 +136,67 @@ function ChatPage() {
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
+  function toggleVoice() {
+    const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) { toast.error("Voice support nahi hai is browser me"); return; }
+    if (listening) {
+      (recRef.current as { stop: () => void } | null)?.stop();
+      setListening(false);
+      return;
+    }
+    const rec = new SR() as {
+      lang: string; continuous: boolean; interimResults: boolean;
+      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+      onend: () => void; onerror: (e: { error: string }) => void;
+      start: () => void; stop: () => void;
+    };
+    rec.lang = "hi-IN";
+    rec.continuous = true;
+    rec.interimResults = true;
+    let finalText = "";
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i];
+        const t = r[0].transcript;
+        if ((r as unknown as { isFinal: boolean }).isFinal) finalText += t + " ";
+        else interim += t;
+      }
+      setInput((finalText + interim).trim());
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = (e) => { toast.error("Voice: " + e.error); setListening(false); };
+    recRef.current = rec;
+    rec.start();
+    setListening(true);
+  }
+
+  async function onOcrFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setOcrBusy(true);
+    const tid = toast.loading("Image padh raha hu...");
+    try {
+      const text = await ocrImage(f);
+      toast.dismiss(tid);
+      if (!text) { toast.error("Kuch padha nahi gaya"); return; }
+      setInput((prev) => (prev ? prev + "\n\n" : "") + text);
+      toast.success("Text mil gaya — review karke send karo");
+      inputRef.current?.focus();
+    } catch (err) {
+      toast.dismiss(tid);
+      toast.error(err instanceof Error ? err.message : "OCR error");
+    } finally {
+      setOcrBusy(false);
+    }
+  }
+
   const suggestions = [
+    "Aaj ka pura hisab: Ram ko 2 brass reti badi, 10 bag cement; Suresh ne 5000 cash diya; 800 ka diesel; Shyam ko 3 trip tractor",
     "Ram Construction ko 2 brass reti badi aur 10 bag cement bheji, bill banao",
     "Aaj 500 ka diesel diya, cash book me add karo",
-    "Suresh ne 5000 cash diya",
-    "Kal tractor ke 3 trip Shyamji ko gaye 1800 per trip",
   ];
 
   return (
@@ -101,7 +209,7 @@ function ChatPage() {
                 <Sparkles className="h-5 w-5" /> Namaste!
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Mujhe Hinglish/Hindi me batao kya likhna hai — main khata, cashbook ya bill bana dunga. Try karo:
+                Bolo (mic 🎤), photo dalo (📷 bill/parchi), ya likho — main pure din ka hisab ek saath khata + cashbook + stock me daal dunga.
               </p>
               <div className="mt-3 space-y-1.5">
                 {suggestions.map((s, i) => (
@@ -119,8 +227,8 @@ function ChatPage() {
 
           {messages.map((m) => {
             const text = getText(m);
-            const action = m.role === "assistant" ? extractAction(text) : null;
-            const cleanText = action ? text.replace(/```json[\s\S]*?```/i, "").trim() : text;
+            const actions = m.role === "assistant" ? extractActions(text) : [];
+            const cleanText = actions.length ? text.replace(/```json[\s\S]*?```/i, "").trim() : text;
             return (
               <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
@@ -131,7 +239,7 @@ function ChatPage() {
                   }`}
                 >
                   {cleanText || (isLoading && m.role === "assistant" ? "..." : "")}
-                  {action && <ActionCard action={action} />}
+                  {actions.length > 0 && <ActionBatch actions={actions} />}
                 </div>
               </div>
             );
@@ -145,6 +253,13 @@ function ChatPage() {
         </div>
 
         <form onSubmit={submit} className="sticky bottom-20 mt-2 flex gap-2 rounded-2xl border border-border bg-card p-2 shadow-md">
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onOcrFile} className="hidden" />
+          <Button type="button" size="icon" variant="ghost" disabled={ocrBusy} onClick={() => fileRef.current?.click()} title="Photo / OCR">
+            {ocrBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+          </Button>
+          <Button type="button" size="icon" variant={listening ? "destructive" : "ghost"} onClick={toggleVoice} title="Voice (Hindi)">
+            {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          </Button>
           <Textarea
             ref={inputRef}
             value={input}
@@ -152,7 +267,7 @@ function ChatPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
             }}
-            placeholder="Likho... e.g. 'Ram ko 2 dumper reti bheji'"
+            placeholder="Bolo, photo daalo, ya likho..."
             rows={1}
             className="min-h-[44px] resize-none border-0 focus-visible:ring-0"
           />
@@ -165,92 +280,70 @@ function ChatPage() {
   );
 }
 
-function ActionCard({ action }: { action: Action }) {
-  const [done, setDone] = useState(false);
+function ActionBatch({ actions }: { actions: Action[] }) {
+  const [done, setDone] = useState<boolean[]>(() => actions.map(() => false));
   const [busy, setBusy] = useState(false);
 
-  async function apply() {
+  async function applyOne(idx: number) {
     setBusy(true);
     try {
-      if (action.action === "create_invoice") {
-        const d = action.data;
-        let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
-        if (!party) {
-          const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
-          party = await db.parties.get(id);
-        }
-        const lines = d.lines.map((l) => ({ ...l, amount: l.qty * l.rate }));
-        const subtotal = lines.reduce((a, l) => a + l.amount, 0);
-        const total = subtotal;
-        const number = await nextInvoiceNumber();
-        const date = todayISO();
-        const invId = await db.invoices.add({
-          number, partyId: party!.id!, date, lines,
-          subtotal, discount: 0, total, paid: d.paid ?? 0,
-          notes: d.notes, createdAt: Date.now(),
-        });
-        await db.ledger.add({ partyId: party!.id!, date, type: "invoice", debit: total, credit: 0, note: `Bill ${number}`, invoiceId: invId, createdAt: Date.now() });
-        if (d.paid && d.paid > 0) {
-          await db.ledger.add({ partyId: party!.id!, date, type: "payment", debit: 0, credit: d.paid, note: `Paid ${number}`, invoiceId: invId, createdAt: Date.now() });
-          await db.cash.add({ date, type: "income", amount: d.paid, category: "Sales", note: number, partyId: party!.id!, createdAt: Date.now() });
-        }
-        const stockUpdates = await adjustStockForLines(lines, -1);
-        const lowMsg = stockUpdates.filter((s) => s.low).map((s) => `${s.name}: ${s.newStock}`).join(", ");
-        toast.success(`Bill ${number} ban gaya${lowMsg ? ` • Low stock: ${lowMsg}` : ""}`);
-      } else if (action.action === "add_cash") {
-        const d = action.data;
-        await db.cash.add({
-          date: d.date || todayISO(),
-          type: d.type, amount: d.amount, category: d.category,
-          note: d.note, createdAt: Date.now(),
-        });
-        toast.success("Cashbook update");
-      } else if (action.action === "add_ledger") {
-        const d = action.data;
-        let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
-        if (!party) {
-          const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
-          party = await db.parties.get(id);
-        }
-        const debit = d.type === "invoice" || (d.type === "adjustment" && d.amount > 0) ? Math.abs(d.amount) : 0;
-        const credit = d.type === "payment" || (d.type === "adjustment" && d.amount < 0) ? Math.abs(d.amount) : 0;
-        await db.ledger.add({
-          partyId: party!.id!, date: todayISO(), type: d.type,
-          debit, credit, note: d.note, createdAt: Date.now(),
-        });
-        if (d.type === "payment") {
-          await db.cash.add({ date: todayISO(), type: "income", amount: Math.abs(d.amount), category: "Party Payment", note: `${d.partyName}`, partyId: party!.id!, createdAt: Date.now() });
-        }
-        toast.success("Khata update");
+      const msg = await applyAction(actions[idx]);
+      setDone((d) => d.map((v, i) => (i === idx ? true : v)));
+      toast.success(msg);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally { setBusy(false); }
+  }
+
+  async function applyAll() {
+    setBusy(true);
+    try {
+      const results: string[] = [];
+      for (let i = 0; i < actions.length; i++) {
+        if (done[i]) continue;
+        results.push(await applyAction(actions[i]));
       }
-      setDone(true);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error");
-    } finally {
-      setBusy(false);
-    }
+      setDone(actions.map(() => true));
+      toast.success(`${results.length} entries saved`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally { setBusy(false); }
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-primary/30 bg-background p-3">
-      <div className="mb-2 text-xs font-bold uppercase tracking-wider text-primary">
-        {action.action.replace("_", " ")}
-      </div>
-      <pre className="num overflow-x-auto whitespace-pre-wrap text-xs text-muted-foreground">
-        {action.action === "create_invoice" && (
-          <>
-            Party: {action.data.partyName}
-            {"\n"}
-            {action.data.lines.map((l) => `  • ${l.qty} ${l.unit} ${l.name} @ ${fmtINR(l.rate)} = ${fmtINR(l.qty * l.rate)}`).join("\n")}
-            {"\n"}Total: {fmtINR(action.data.lines.reduce((a, l) => a + l.qty * l.rate, 0))}
-          </>
-        )}
-        {action.action === "add_cash" && `${action.data.type.toUpperCase()} ${fmtINR(action.data.amount)} — ${action.data.category}`}
-        {action.action === "add_ledger" && `${action.data.partyName}: ${action.data.type} ${fmtINR(Math.abs(action.data.amount))}`}
-      </pre>
-      <Button size="sm" onClick={apply} disabled={done || busy} className="mt-2 gap-1">
-        {done ? <><CheckCircle2 className="h-4 w-4" /> Done</> : busy ? "Saving..." : "Confirm & Save"}
-      </Button>
+    <div className="mt-3 space-y-2">
+      {actions.map((a, i) => (
+        <div key={i} className="rounded-xl border border-primary/30 bg-background p-3">
+          <div className="mb-1 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-primary">
+            <span>{a.action.replace("_", " ")}</span>
+            {done[i] && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+          </div>
+          <pre className="num overflow-x-auto whitespace-pre-wrap text-xs text-muted-foreground">
+            {a.action === "create_invoice" && (
+              <>
+                {a.data.partyName}
+                {"\n"}
+                {a.data.lines.map((l) => `  • ${l.qty} ${l.unit} ${l.name} @ ${fmtINR(l.rate)} = ${fmtINR(l.qty * l.rate)}`).join("\n")}
+                {"\n"}Total: {fmtINR(a.data.lines.reduce((acc, l) => acc + l.qty * l.rate, 0))}
+                {a.data.paid ? `  •  Paid: ${fmtINR(a.data.paid)}` : ""}
+              </>
+            )}
+            {a.action === "add_cash" && `${a.data.type.toUpperCase()} ${fmtINR(a.data.amount)} — ${a.data.category}${a.data.note ? " ("+a.data.note+")" : ""}`}
+            {a.action === "add_ledger" && `${a.data.partyName}: ${a.data.type} ${fmtINR(Math.abs(a.data.amount))}`}
+          </pre>
+          {!done[i] && (
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => applyOne(i)} className="mt-2">
+              Save this
+            </Button>
+          )}
+        </div>
+      ))}
+      {actions.length > 1 && !done.every(Boolean) && (
+        <Button size="sm" onClick={applyAll} disabled={busy} className="w-full gap-1">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+          Save All ({actions.length})
+        </Button>
+      )}
     </div>
   );
 }

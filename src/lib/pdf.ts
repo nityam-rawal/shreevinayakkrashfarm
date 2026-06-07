@@ -3,6 +3,30 @@ import autoTable from "jspdf-autotable";
 import type { Invoice, Party } from "./db";
 import { fmtINR, fmtDate } from "./format";
 
+// Convert number to Indian English words (Lakh, Crore). Up to 999 Cr.
+function numToWords(n: number): string {
+  n = Math.round(n);
+  if (n === 0) return "Zero";
+  const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+    "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const two = (x: number): string => x < 20 ? a[x] : (b[Math.floor(x / 10)] + (x % 10 ? " " + a[x % 10] : ""));
+  const three = (x: number): string => {
+    const h = Math.floor(x / 100), r = x % 100;
+    return (h ? a[h] + " Hundred" + (r ? " " : "") : "") + (r ? two(r) : "");
+  };
+  const cr = Math.floor(n / 10000000); n %= 10000000;
+  const lk = Math.floor(n / 100000); n %= 100000;
+  const th = Math.floor(n / 1000); n %= 1000;
+  let s = "";
+  if (cr) s += two(cr) + " Crore ";
+  if (lk) s += two(lk) + " Lakh ";
+  if (th) s += two(th) + " Thousand ";
+  if (n) s += three(n);
+  return s.trim();
+}
+
+
 export function buildInvoicePDF(invoice: Invoice, party: Party): jsPDF {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -84,11 +108,28 @@ export function buildInvoicePDF(invoice: Invoice, party: Party): jsPDF {
     doc.text(fmtINR(invoice.total - invoice.paid), rightX, afterTable + 78, { align: "right" });
   }
 
+  // Amount in words
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(80);
+  doc.text(`Rupees ${numToWords(invoice.total)} Only`, 40, afterTable + 60);
+
   if (invoice.notes) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(10);
-    doc.text(`Note: ${invoice.notes}`, 40, afterTable + 110);
+    doc.setTextColor(60);
+    doc.text(`Note: ${invoice.notes}`, 40, afterTable + 130);
   }
+
+  // Signature block
+  const sigY = doc.internal.pageSize.getHeight() - 90;
+  doc.setDrawColor(150);
+  doc.line(pageW - 200, sigY, pageW - 40, sigY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(60);
+  doc.text("Authorised Signatory", pageW - 120, sigY + 14, { align: "center" });
+  doc.text("for Shree Vinayak Krashi Farm", pageW - 120, sigY + 28, { align: "center" });
 
   // Footer
   doc.setFont("helvetica", "normal");
@@ -103,6 +144,7 @@ export function buildInvoicePDF(invoice: Invoice, party: Party): jsPDF {
 
   return doc;
 }
+
 
 export function buildLedgerPDF(party: Party, entries: { date: string; type: string; debit: number; credit: number; note?: string }[], balance: number): jsPDF {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
