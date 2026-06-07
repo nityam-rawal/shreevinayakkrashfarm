@@ -38,18 +38,26 @@ function getText(message: UIMessage): string {
 function ChatPage() {
   const parties = useLiveQuery(() => db.parties.toArray(), [], []);
   const items = useLiveQuery(() => db.items.toArray(), [], []);
+  const ctxData = useLiveQuery(async () => {
+    const ps = await db.parties.toArray();
+    const its = await db.items.toArray();
+    const withBal = await Promise.all(
+      ps.map(async (p) => ({ id: p.id!, name: p.name, type: p.type, balance: await partyBalance(p.id!) })),
+    );
+    const coh = await cashOnHand();
+    return {
+      parties: withBal,
+      items: its.map((i) => ({ id: i.id!, name: i.name, unit: i.unit, rate: i.rate, kind: i.kind, stock: i.stock })),
+      cashOnHand: coh,
+    };
+  }, [], { parties: [], items: [], cashOnHand: 0 });
 
   const transport = useMemo(
     () => new DefaultChatTransport({
       api: "/api/chat",
-      body: () => ({
-        context: {
-          parties: parties.map((p) => ({ id: p.id!, name: p.name, type: p.type })),
-          items: items.map((i) => ({ id: i.id!, name: i.name, unit: i.unit, rate: i.rate, kind: i.kind })),
-        },
-      }),
+      body: () => ({ context: ctxData }),
     }),
-    [parties, items],
+    [ctxData],
   );
 
   const { messages, sendMessage, status } = useChat({
