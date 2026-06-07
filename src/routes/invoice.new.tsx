@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useMemo, useState } from "react";
-import { db, nextInvoiceNumber, type InvoiceLine } from "@/lib/db";
+import { db, nextInvoiceNumber, adjustStockForLines, type InvoiceLine } from "@/lib/db";
 import { fmtINR, todayISO } from "@/lib/format";
 import { AppShell } from "@/components/AppShell";
 import { Plus, Trash2, Save } from "lucide-react";
