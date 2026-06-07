@@ -194,7 +194,9 @@ function ActionCard({ action }: { action: Action }) {
           await db.ledger.add({ partyId: party!.id!, date, type: "payment", debit: 0, credit: d.paid, note: `Paid ${number}`, invoiceId: invId, createdAt: Date.now() });
           await db.cash.add({ date, type: "income", amount: d.paid, category: "Sales", note: number, partyId: party!.id!, createdAt: Date.now() });
         }
-        toast.success(`Bill ${number} ban gaya`);
+        const stockUpdates = await adjustStockForLines(lines, -1);
+        const lowMsg = stockUpdates.filter((s) => s.low).map((s) => `${s.name}: ${s.newStock}`).join(", ");
+        toast.success(`Bill ${number} ban gaya${lowMsg ? ` • Low stock: ${lowMsg}` : ""}`);
       } else if (action.action === "add_cash") {
         const d = action.data;
         await db.cash.add({
