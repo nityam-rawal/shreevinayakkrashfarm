@@ -56,31 +56,56 @@ function Stock() {
             Koi item nahi. Add karo.
           </div>
         )}
-        {items.map((it) => (
-          <div key={it.id} className="flex items-center justify-between rounded-2xl border border-border bg-card p-4">
-            <div>
-              <div className="font-semibold">{it.name}</div>
-              <div className="text-xs text-muted-foreground">
-                {it.category} • per {it.unit}
+        {items.map((it) => {
+          const isStock = it.kind === "stock";
+          const qty = it.stock ?? 0;
+          const low = it.lowStockAt != null && qty <= it.lowStockAt;
+          return (
+            <div key={it.id} className="flex items-center justify-between rounded-2xl border border-border bg-card p-4">
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold">{it.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {it.category} • per {it.unit}
+                </div>
+                {isStock && (
+                  <div className={`mt-1 text-xs font-semibold ${low ? "text-destructive" : "text-success"}`}>
+                    Stock: {qty} {it.unit}{low ? " (LOW!)" : ""}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="num font-display font-bold text-primary">{fmtINR(it.rate)}</div>
+                {isStock && (
+                  <button
+                    onClick={async () => {
+                      const v = prompt(`Stock-in for ${it.name} (${it.unit}). Kitna add karna?`, "0");
+                      const n = Number(v);
+                      if (!n) return;
+                      await db.items.update(it.id!, { stock: qty + n });
+                      toast.success(`+${n} ${it.unit} added`);
+                    }}
+                    className="rounded-md bg-secondary px-2 py-1 text-xs font-semibold hover:bg-secondary/80"
+                    title="Stock-in"
+                  >
+                    +Stock
+                  </button>
+                )}
+                <button
+                  onClick={() => { setEditing(it.id!); setOpen(true); }}
+                  className="p-1.5 text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={async () => { await db.items.delete(it.id!); toast.success("Delete"); }}
+                  className="p-1.5 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="num font-display font-bold text-primary">{fmtINR(it.rate)}</div>
-              <button
-                onClick={() => { setEditing(it.id!); setOpen(true); }}
-                className="p-1.5 text-muted-foreground hover:text-foreground"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button
-                onClick={async () => { await db.items.delete(it.id!); toast.success("Delete"); }}
-                className="p-1.5 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </AppShell>
   );
