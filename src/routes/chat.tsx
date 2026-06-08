@@ -1,43 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db, nextInvoiceNumber, partyBalance, cashOnHand, adjustStockForLines } from "@/lib/db";
+import { useEffect, useRef, useState } from "react";
+import { db, nextInvoiceNumber, adjustStockForLines } from "@/lib/db";
+import { parseCommand, type ParsedAction } from "@/lib/nlp";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Sparkles, CheckCircle2, Loader2, Mic, MicOff, Camera } from "lucide-react";
+import { Send, Sparkles, CheckCircle2, Loader2, Mic, MicOff, Camera, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { todayISO, fmtINR } from "@/lib/format";
 import { ocrImage } from "@/lib/ocr";
 
 export const Route = createFileRoute("/chat")({
-  head: () => ({ meta: [{ title: "AI Assistant" }] }),
+  head: () => ({ meta: [{ title: "AI Assistant — Offline" }] }),
   component: ChatPage,
 });
 
-type Action =
-  | { action: "create_invoice"; data: { partyName: string; lines: { name: string; unit: string; qty: number; rate: number }[]; paid?: number; notes?: string } }
-  | { action: "add_cash"; data: { date?: string; type: "income" | "expense"; amount: number; category: string; note?: string } }
-  | { action: "add_ledger"; data: { partyName: string; type: "payment" | "invoice" | "adjustment"; amount: number; note?: string } };
+type ChatMsg =
+  | { id: string; role: "user"; text: string }
+  | { id: string; role: "assistant"; text: string; actions: ParsedAction[]; done: boolean[] };
 
-function extractActions(text: string): Action[] {
-  const m = text.match(/```json\s*([\s\S]*?)```/i);
-  if (!m) return [];
-  try {
-    const j = JSON.parse(m[1]);
-    if (Array.isArray(j?.actions)) return j.actions as Action[];
-    if (j && typeof j === "object" && "action" in j) return [j as Action];
-  } catch { /* ignore */ }
-  return [];
-}
-
-function getText(message: UIMessage): string {
-  return message.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
-}
-
-async function applyAction(a: Action): Promise<string> {
+async function applyAction(a: ParsedAction): Promise<string> {
   if (a.action === "create_invoice") {
     const d = a.data;
     let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
@@ -66,53 +48,26 @@ async function applyAction(a: Action): Promise<string> {
   }
   if (a.action === "add_cash") {
     const d = a.data;
-    await db.cash.add({ date: d.date || todayISO(), type: d.type, amount: d.amount, category: d.category, note: d.note, createdAt: Date.now() });
+    await db.cash.add({ date: todayISO(), type: d.type, amount: d.amount, category: d.category, note: d.note, createdAt: Date.now() });
     return `Cash ${d.type} ${fmtINR(d.amount)}`;
   }
-  // add_ledger
   const d = a.data;
   let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
   if (!party) {
     const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
     party = await db.parties.get(id);
   }
-  const debit = d.type === "invoice" || (d.type === "adjustment" && d.amount > 0) ? Math.abs(d.amount) : 0;
-  const credit = d.type === "payment" || (d.type === "adjustment" && d.amount < 0) ? Math.abs(d.amount) : 0;
+  const debit = d.type === "invoice" ? Math.abs(d.amount) : 0;
+  const credit = d.type === "payment" ? Math.abs(d.amount) : 0;
   await db.ledger.add({ partyId: party!.id!, date: todayISO(), type: d.type, debit, credit, note: d.note, createdAt: Date.now() });
   if (d.type === "payment") {
     await db.cash.add({ date: todayISO(), type: "income", amount: Math.abs(d.amount), category: "Party Payment", note: d.partyName, partyId: party!.id!, createdAt: Date.now() });
   }
-  return `Khata ${d.partyName}`;
+  return `Khata: ${d.partyName}`;
 }
 
 function ChatPage() {
-  const ctxData = useLiveQuery(async () => {
-    const ps = await db.parties.toArray();
-    const its = await db.items.toArray();
-    const withBal = await Promise.all(
-      ps.map(async (p) => ({ id: p.id!, name: p.name, type: p.type, balance: await partyBalance(p.id!) })),
-    );
-    const coh = await cashOnHand();
-    return {
-      parties: withBal,
-      items: its.map((i) => ({ id: i.id!, name: i.name, unit: i.unit, rate: i.rate, kind: i.kind, stock: i.stock })),
-      cashOnHand: coh,
-    };
-  }, [], { parties: [], items: [], cashOnHand: 0 });
-
-  const transport = useMemo(
-    () => new DefaultChatTransport({
-      api: "/api/chat",
-      body: () => ({ context: ctxData }),
-    }),
-    [ctxData],
-  );
-
-  const { messages, sendMessage, status } = useChat({
-    transport,
-    onError: (err) => toast.error(err.message || "AI error"),
-  });
-
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
@@ -120,7 +75,6 @@ function ChatPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<unknown>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isLoading = status === "submitted" || status === "streaming";
 
   useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => {
@@ -130,10 +84,49 @@ function ChatPage() {
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
     const text = input.trim();
-    if (!text || isLoading) return;
+    if (!text) return;
     setInput("");
-    await sendMessage({ text });
-    setTimeout(() => inputRef.current?.focus(), 50);
+    const userMsg: ChatMsg = { id: crypto.randomUUID(), role: "user", text };
+    setMessages((m) => [...m, userMsg]);
+    const result = await parseCommand(text);
+    const reply: ChatMsg = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      text: result.summary + (result.unmatched.length ? `\n\nNot understood: ${result.unmatched.join("; ")}` : ""),
+      actions: result.actions,
+      done: result.actions.map(() => false),
+    };
+    setMessages((m) => [...m, reply]);
+    setTimeout(() => inputRef.current?.focus(), 30);
+  }
+
+  async function applyOne(msgId: string, idx: number) {
+    const m = messages.find((x) => x.id === msgId);
+    if (!m || m.role !== "assistant") return;
+    try {
+      const r = await applyAction(m.actions[idx]);
+      toast.success(r);
+      setMessages((all) => all.map((x) => x.id === msgId && x.role === "assistant"
+        ? { ...x, done: x.done.map((v, i) => i === idx ? true : v) }
+        : x));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error");
+    }
+  }
+
+  async function applyAll(msgId: string) {
+    const m = messages.find((x) => x.id === msgId);
+    if (!m || m.role !== "assistant") return;
+    let n = 0;
+    for (let i = 0; i < m.actions.length; i++) {
+      if (m.done[i]) continue;
+      try { await applyAction(m.actions[i]); n++; } catch (e) {
+        toast.error(`Step ${i + 1}: ${e instanceof Error ? e.message : "fail"}`);
+      }
+    }
+    setMessages((all) => all.map((x) => x.id === msgId && x.role === "assistant"
+      ? { ...x, done: x.actions.map(() => true) } : x));
+    toast.success(`${n} entries save ho gayi`);
   }
 
   function toggleVoice() {
@@ -182,7 +175,7 @@ function ChatPage() {
       const text = await ocrImage(f);
       toast.dismiss(tid);
       if (!text) { toast.error("Kuch padha nahi gaya"); return; }
-      setInput((prev) => (prev ? prev + "\n\n" : "") + text);
+      setInput((prev) => (prev ? prev + "\n" : "") + text);
       toast.success("Text mil gaya — review karke send karo");
       inputRef.current?.focus();
     } catch (err) {
@@ -194,9 +187,10 @@ function ChatPage() {
   }
 
   const suggestions = [
-    "Aaj ka pura hisab: Ram ko 2 brass reti badi, 10 bag cement; Suresh ne 5000 cash diya; 800 ka diesel; Shyam ko 3 trip tractor",
-    "Ram Construction ko 2 brass reti badi aur 10 bag cement bheji, bill banao",
-    "Aaj 500 ka diesel diya, cash book me add karo",
+    "Ram ko 2 brass reti badi aur 10 bag cement bheji",
+    "Suresh ne 5000 cash diya",
+    "500 ka diesel kharcha",
+    "Shyam ko 3 trip tractor bheji, 1000 paid",
   ];
 
   return (
@@ -208,8 +202,11 @@ function ChatPage() {
               <div className="flex items-center gap-2 font-display font-bold text-primary">
                 <Sparkles className="h-5 w-5" /> Namaste!
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Bolo (mic 🎤), photo dalo (📷 bill/parchi), ya likho — main pure din ka hisab ek saath khata + cashbook + stock me daal dunga.
+              <p className="mt-1 flex items-center gap-1 text-xs text-success">
+                <WifiOff className="h-3 w-3" /> 100% Offline — data phone se bahar nahi jaata
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Bolo 🎤, photo 📷 daalo, ya likho. Hindi/Hinglish me bill, khata, cashbook sab ek saath.
               </p>
               <div className="mt-3 space-y-1.5">
                 {suggestions.map((s, i) => (
@@ -225,31 +222,55 @@ function ChatPage() {
             </div>
           )}
 
-          {messages.map((m) => {
-            const text = getText(m);
-            const actions = m.role === "assistant" ? extractActions(text) : [];
-            const cleanText = actions.length ? text.replace(/```json[\s\S]*?```/i, "").trim() : text;
-            return (
-              <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
-                    m.role === "user"
-                      ? "rounded-br-md bg-primary text-primary-foreground"
-                      : "rounded-bl-md border border-border bg-card"
-                  }`}
-                >
-                  {cleanText || (isLoading && m.role === "assistant" ? "..." : "")}
-                  {actions.length > 0 && <ActionBatch actions={actions} />}
-                </div>
+          {messages.map((m) => (
+            <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
+                  m.role === "user"
+                    ? "rounded-br-md bg-primary text-primary-foreground"
+                    : "rounded-bl-md border border-border bg-card"
+                }`}
+              >
+                {m.text}
+                {m.role === "assistant" && m.actions.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {m.actions.map((a, i) => (
+                      <div key={i} className="rounded-xl border border-primary/30 bg-background p-3">
+                        <div className="mb-1 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-primary">
+                          <span>{a.action.replace("_", " ")}</span>
+                          {m.done[i] && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                        </div>
+                        <pre className="num overflow-x-auto whitespace-pre-wrap text-xs text-muted-foreground">
+                          {a.action === "create_invoice" && (
+                            <>
+                              {a.data.partyName}
+                              {"\n"}
+                              {a.data.lines.map((l) => `  • ${l.qty} ${l.unit} ${l.name} @ ${fmtINR(l.rate)} = ${fmtINR(l.qty * l.rate)}`).join("\n")}
+                              {"\n"}Total: {fmtINR(a.data.lines.reduce((acc, l) => acc + l.qty * l.rate, 0))}
+                              {a.data.paid ? `  •  Paid: ${fmtINR(a.data.paid)}` : ""}
+                            </>
+                          )}
+                          {a.action === "add_cash" && `${a.data.type.toUpperCase()} ${fmtINR(a.data.amount)} — ${a.data.category}`}
+                          {a.action === "add_ledger" && `${a.data.partyName}: ${a.data.type} ${fmtINR(Math.abs(a.data.amount))}`}
+                        </pre>
+                        {!m.done[i] && (
+                          <Button size="sm" variant="outline" onClick={() => applyOne(m.id, i)} className="mt-2">
+                            Save this
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    {m.actions.length > 1 && !m.done.every(Boolean) && (
+                      <Button size="sm" onClick={() => applyAll(m.id)} className="w-full gap-1">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Save All ({m.actions.length})
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
-            );
-          })}
-
-          {status === "submitted" && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Vinayak AI soch raha hai...
             </div>
-          )}
+          ))}
         </div>
 
         <form onSubmit={submit} className="sticky bottom-20 mt-2 flex gap-2 rounded-2xl border border-border bg-card p-2 shadow-md">
@@ -271,79 +292,11 @@ function ChatPage() {
             rows={1}
             className="min-h-[44px] resize-none border-0 focus-visible:ring-0"
           />
-          <Button type="submit" disabled={isLoading || !input.trim()} size="icon">
+          <Button type="submit" disabled={!input.trim()} size="icon">
             <Send className="h-4 w-4" />
           </Button>
         </form>
       </div>
     </AppShell>
-  );
-}
-
-function ActionBatch({ actions }: { actions: Action[] }) {
-  const [done, setDone] = useState<boolean[]>(() => actions.map(() => false));
-  const [busy, setBusy] = useState(false);
-
-  async function applyOne(idx: number) {
-    setBusy(true);
-    try {
-      const msg = await applyAction(actions[idx]);
-      setDone((d) => d.map((v, i) => (i === idx ? true : v)));
-      toast.success(msg);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error");
-    } finally { setBusy(false); }
-  }
-
-  async function applyAll() {
-    setBusy(true);
-    try {
-      const results: string[] = [];
-      for (let i = 0; i < actions.length; i++) {
-        if (done[i]) continue;
-        results.push(await applyAction(actions[i]));
-      }
-      setDone(actions.map(() => true));
-      toast.success(`${results.length} entries saved`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error");
-    } finally { setBusy(false); }
-  }
-
-  return (
-    <div className="mt-3 space-y-2">
-      {actions.map((a, i) => (
-        <div key={i} className="rounded-xl border border-primary/30 bg-background p-3">
-          <div className="mb-1 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-primary">
-            <span>{a.action.replace("_", " ")}</span>
-            {done[i] && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-          </div>
-          <pre className="num overflow-x-auto whitespace-pre-wrap text-xs text-muted-foreground">
-            {a.action === "create_invoice" && (
-              <>
-                {a.data.partyName}
-                {"\n"}
-                {a.data.lines.map((l) => `  • ${l.qty} ${l.unit} ${l.name} @ ${fmtINR(l.rate)} = ${fmtINR(l.qty * l.rate)}`).join("\n")}
-                {"\n"}Total: {fmtINR(a.data.lines.reduce((acc, l) => acc + l.qty * l.rate, 0))}
-                {a.data.paid ? `  •  Paid: ${fmtINR(a.data.paid)}` : ""}
-              </>
-            )}
-            {a.action === "add_cash" && `${a.data.type.toUpperCase()} ${fmtINR(a.data.amount)} — ${a.data.category}${a.data.note ? " ("+a.data.note+")" : ""}`}
-            {a.action === "add_ledger" && `${a.data.partyName}: ${a.data.type} ${fmtINR(Math.abs(a.data.amount))}`}
-          </pre>
-          {!done[i] && (
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => applyOne(i)} className="mt-2">
-              Save this
-            </Button>
-          )}
-        </div>
-      ))}
-      {actions.length > 1 && !done.every(Boolean) && (
-        <Button size="sm" onClick={applyAll} disabled={busy} className="w-full gap-1">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-          Save All ({actions.length})
-        </Button>
-      )}
-    </div>
   );
 }

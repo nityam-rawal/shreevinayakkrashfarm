@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Users, BookOpen, Boxes, FileText, Sparkles, Lock } from "lucide-react";
+import { Home, Users, BookOpen, Boxes, FileText, Sparkles, Lock, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { hasPin, lock } from "@/lib/lock";
@@ -31,6 +31,13 @@ export function AppShell({ children, title, action }: { children: ReactNode; tit
           </Link>
           <div className="flex items-center gap-1">
             {action}
+            <Link
+              to="/settings"
+              className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+              title="Settings & Backup"
+            >
+              <Settings className="h-4 w-4" />
+            </Link>
             {hasPin() && (
               <button
                 onClick={() => { lock(); location.reload(); }}

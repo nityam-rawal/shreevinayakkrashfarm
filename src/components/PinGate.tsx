@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { hasPin, isUnlocked, setPin, verifyPin } from "@/lib/lock";
+import { hasPin, isUnlocked, lockoutRemainingMs, setPin, verifyPin } from "@/lib/lock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Lock, ShieldCheck } from "lucide-react";
@@ -30,8 +30,14 @@ export function PinGate({ children }: { children: ReactNode }) {
         await setPin(pin);
         setUnlocked(true);
       } else {
+        if (lockoutRemainingMs() > 0) {
+          throw new Error(`Bahut galat tries. ${Math.ceil(lockoutRemainingMs() / 1000)}s baad try karo.`);
+        }
         const ok = await verifyPin(pin);
-        if (!ok) throw new Error("Galat PIN");
+        if (!ok) {
+          const rem = lockoutRemainingMs();
+          throw new Error(rem > 0 ? `Galat PIN — ${Math.ceil(rem / 1000)}s ke liye block.` : "Galat PIN");
+        }
         setUnlocked(true);
       }
     } catch (e2) {
