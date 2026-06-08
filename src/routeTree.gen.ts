@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StockRouteImport } from './routes/stock'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CashbookRouteImport } from './routes/cashbook'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,11 +18,15 @@ import { Route as PartiesIndexRouteImport } from './routes/parties.index'
 import { Route as PartiesIdRouteImport } from './routes/parties.$id'
 import { Route as InvoiceNewRouteImport } from './routes/invoice.new'
 import { Route as InvoiceIdRouteImport } from './routes/invoice.$id'
-import { Route as ApiChatRouteImport } from './routes/api/chat'
 
 const StockRoute = StockRouteImport.update({
   id: '/stock',
   path: '/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatRoute = ChatRouteImport.update({
@@ -59,18 +64,13 @@ const InvoiceIdRoute = InvoiceIdRouteImport.update({
   path: '/invoice/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiChatRoute = ApiChatRouteImport.update({
-  id: '/api/chat',
-  path: '/api/chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cashbook': typeof CashbookRoute
   '/chat': typeof ChatRoute
+  '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
-  '/api/chat': typeof ApiChatRoute
   '/invoice/$id': typeof InvoiceIdRoute
   '/invoice/new': typeof InvoiceNewRoute
   '/parties/$id': typeof PartiesIdRoute
@@ -80,8 +80,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cashbook': typeof CashbookRoute
   '/chat': typeof ChatRoute
+  '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
-  '/api/chat': typeof ApiChatRoute
   '/invoice/$id': typeof InvoiceIdRoute
   '/invoice/new': typeof InvoiceNewRoute
   '/parties/$id': typeof PartiesIdRoute
@@ -92,8 +92,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/cashbook': typeof CashbookRoute
   '/chat': typeof ChatRoute
+  '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
-  '/api/chat': typeof ApiChatRoute
   '/invoice/$id': typeof InvoiceIdRoute
   '/invoice/new': typeof InvoiceNewRoute
   '/parties/$id': typeof PartiesIdRoute
@@ -105,8 +105,8 @@ export interface FileRouteTypes {
     | '/'
     | '/cashbook'
     | '/chat'
+    | '/settings'
     | '/stock'
-    | '/api/chat'
     | '/invoice/$id'
     | '/invoice/new'
     | '/parties/$id'
@@ -116,8 +116,8 @@ export interface FileRouteTypes {
     | '/'
     | '/cashbook'
     | '/chat'
+    | '/settings'
     | '/stock'
-    | '/api/chat'
     | '/invoice/$id'
     | '/invoice/new'
     | '/parties/$id'
@@ -127,8 +127,8 @@ export interface FileRouteTypes {
     | '/'
     | '/cashbook'
     | '/chat'
+    | '/settings'
     | '/stock'
-    | '/api/chat'
     | '/invoice/$id'
     | '/invoice/new'
     | '/parties/$id'
@@ -139,8 +139,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CashbookRoute: typeof CashbookRoute
   ChatRoute: typeof ChatRoute
+  SettingsRoute: typeof SettingsRoute
   StockRoute: typeof StockRoute
-  ApiChatRoute: typeof ApiChatRoute
   InvoiceIdRoute: typeof InvoiceIdRoute
   InvoiceNewRoute: typeof InvoiceNewRoute
   PartiesIdRoute: typeof PartiesIdRoute
@@ -154,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/stock'
       fullPath: '/stock'
       preLoaderRoute: typeof StockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/chat': {
@@ -205,13 +212,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InvoiceIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/chat': {
-      id: '/api/chat'
-      path: '/api/chat'
-      fullPath: '/api/chat'
-      preLoaderRoute: typeof ApiChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -219,8 +219,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CashbookRoute: CashbookRoute,
   ChatRoute: ChatRoute,
+  SettingsRoute: SettingsRoute,
   StockRoute: StockRoute,
-  ApiChatRoute: ApiChatRoute,
   InvoiceIdRoute: InvoiceIdRoute,
   InvoiceNewRoute: InvoiceNewRoute,
   PartiesIdRoute: PartiesIdRoute,
