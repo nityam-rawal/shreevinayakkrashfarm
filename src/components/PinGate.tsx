@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { hasPin, isUnlocked, setPin, verifyPin } from "@/lib/lock";
+import { hasPin, isUnlocked, lockoutRemainingMs, setPin, verifyPin } from "@/lib/lock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Lock, ShieldCheck } from "lucide-react";
