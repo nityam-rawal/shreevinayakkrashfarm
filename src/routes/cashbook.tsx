@@ -52,7 +52,7 @@ function Cashbook() {
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="max-w-[180px]" />
+        <div className="max-w-[180px] flex-1"><DateField value={date} onChange={setDate} /></div>
         <div className="flex gap-3 text-sm">
           <div className="rounded-lg bg-success/10 px-3 py-1.5 num font-semibold text-success">+ {fmtINR(dayIn)}</div>
           <div className="rounded-lg bg-destructive/10 px-3 py-1.5 num font-semibold text-destructive">- {fmtINR(dayOut)}</div>
