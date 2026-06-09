@@ -96,7 +96,7 @@ function NewInvoice() {
         </div>
         <div>
           <Label>Date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </div>
       </div>
 
