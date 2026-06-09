@@ -3,10 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { downloadBackup, importBackup, wipeAll } from "@/lib/backup";
 import { changePin, clearPin, hasPin, setPin } from "@/lib/lock";
+import { getShop, saveShop, type ShopProfile } from "@/lib/shop";
 import { toast } from "sonner";
-import { Download, Upload, Trash2, ShieldCheck, KeyRound, WifiOff } from "lucide-react";
+import { Download, Upload, Trash2, ShieldCheck, KeyRound, WifiOff, Store } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings & Backup" }] }),
@@ -20,6 +22,12 @@ function SettingsPage() {
   const [oldPin, setOldPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [shop, setShopState] = useState<ShopProfile>(() => getShop());
+
+  function saveShopProfile() {
+    saveShop(shop);
+    toast.success("Shop details save ho gayi");
+  }
 
   useEffect(() => {
     setHasPinState(hasPin());
@@ -94,6 +102,47 @@ function SettingsPage() {
             ? "Phone online hai — par yeh app online jaaye bina kaam karta hai. Data kahin upload nahi hota."
             : "100% Offline — data phone me hi hai."}
         </div>
+
+        {/* Shop profile */}
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="flex items-center gap-2 font-display font-bold">
+            <Store className="h-4 w-4" /> Shop / Dukaan
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Ye details aapke bills aur WhatsApp reminders me automatic aayengi. UPI ID set karoge to customer ko 1-tap payment link milega.
+          </p>
+          <div className="mt-3 space-y-2">
+            <div>
+              <Label>Shop ka naam</Label>
+              <Input value={shop.name} onChange={(e) => setShopState({ ...shop, name: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Phone</Label>
+                <Input value={shop.phone} onChange={(e) => setShopState({ ...shop, phone: e.target.value })} inputMode="tel" />
+              </div>
+              <div>
+                <Label>GSTIN</Label>
+                <Input value={shop.gstin} onChange={(e) => setShopState({ ...shop, gstin: e.target.value.toUpperCase() })} />
+              </div>
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Input value={shop.address} onChange={(e) => setShopState({ ...shop, address: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>UPI ID</Label>
+                <Input value={shop.upiId} onChange={(e) => setShopState({ ...shop, upiId: e.target.value })} placeholder="name@oksbi" />
+              </div>
+              <div>
+                <Label>UPI Name</Label>
+                <Input value={shop.upiName} onChange={(e) => setShopState({ ...shop, upiName: e.target.value })} />
+              </div>
+            </div>
+            <Button onClick={saveShopProfile} className="w-full">Save Shop Details</Button>
+          </div>
+        </section>
 
         {/* Backup */}
         <section className="rounded-2xl border border-border bg-card p-4">
