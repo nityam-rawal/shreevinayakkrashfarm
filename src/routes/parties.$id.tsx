@@ -215,7 +215,7 @@ function AddEntryForm({ partyId, onDone }: { partyId: number; onDone: () => void
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </div>
         <div>
           <Label>Amount ₹</Label>
