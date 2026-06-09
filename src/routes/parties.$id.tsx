@@ -150,11 +150,19 @@ function PartyDetail() {
               )}
               {entries.map((e) => {
                 running += e.debit - e.credit;
+                const clickable = e.type === "invoice" && e.invoiceId;
+                const rowClass = `border-t border-border ${clickable ? "cursor-pointer hover:bg-accent/40" : ""}`;
+                const onClick = clickable
+                  ? () => navigate({ to: "/invoice/$id", params: { id: String(e.invoiceId) } })
+                  : undefined;
                 return (
-                  <tr key={e.id} className="border-t border-border">
+                  <tr key={e.id} className={rowClass} onClick={onClick}>
                     <td className="px-3 py-2 text-xs">{fmtDate(e.date)}</td>
                     <td className="px-3 py-2">
-                      <div className="text-xs font-semibold uppercase">{e.type}</div>
+                      <div className="text-xs font-semibold uppercase">
+                        {e.type}
+                        {clickable && <span className="ml-1 text-primary">→ Bill</span>}
+                      </div>
                       {e.note && <div className="text-xs text-muted-foreground">{e.note}</div>}
                     </td>
                     <td className="num px-3 py-2 text-right">{e.debit ? fmtINR(e.debit) : ""}</td>
