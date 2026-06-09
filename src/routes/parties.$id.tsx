@@ -4,7 +4,7 @@ import { useState } from "react";
 import { db, partyBalance } from "@/lib/db";
 import { fmtINR, fmtDate, todayISO } from "@/lib/format";
 import { AppShell } from "@/components/AppShell";
-import { ArrowLeft, Phone, Share2, Plus, FileText } from "lucide-react";
+import { ArrowLeft, Phone, Share2, Plus, FileText, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { buildLedgerPDF, shareOrDownloadPDF } from "@/lib/pdf";
 import { DateField } from "@/components/DateField";
+import { VoiceButton } from "@/components/VoiceButton";
+import { getShop, upiLink } from "@/lib/shop";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/parties/$id")({
@@ -95,9 +97,18 @@ function PartyDetail() {
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={sharePDF} className="gap-1">
-            <Share2 className="h-4 w-4" /> WhatsApp
+            <Share2 className="h-4 w-4" /> Khata
           </Button>
         </div>
+        {balance > 0 && party.phone && (
+          <button
+            onClick={() => sendReminder(party, balance)}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-success-foreground hover:bg-success/90"
+          >
+            <MessageCircle className="h-4 w-4" />
+            WhatsApp Reminder + UPI Link
+          </button>
+        )}
       </div>
 
       <div className="mt-5 flex gap-2">
@@ -179,6 +190,31 @@ function PartyDetail() {
   );
 }
 
+function sendReminder(party: { name: string; phone?: string }, balance: number) {
+  if (!party.phone) {
+    toast.error("Phone number nahi hai");
+    return;
+  }
+  const shop = getShop();
+  const upi = upiLink(balance, `${shop.name} - ${party.name}`);
+  const lines = [
+    `Namaste *${party.name}* 🙏`,
+    ``,
+    `Aapka bakaya: *${fmtINR(balance)}*`,
+    ``,
+    upi
+      ? `Yahan se 1-tap me pay karo:\n${upi}`
+      : `Kripya payment jaldi karein.`,
+    ``,
+    `— ${shop.name}`,
+    shop.phone ? `Call: ${shop.phone}` : "",
+  ].filter(Boolean).join("\n");
+  const phone = party.phone.replace(/\D/g, "");
+  const num = phone.length === 10 ? `91${phone}` : phone;
+  const url = `https://wa.me/${num}?text=${encodeURIComponent(lines)}`;
+  window.open(url, "_blank");
+}
+
 function AddEntryForm({ partyId, onDone }: { partyId: number; onDone: () => void }) {
   const [mode, setMode] = useState<"invoice" | "payment" | "adjustment">("payment");
   const [amount, setAmount] = useState("");
@@ -232,7 +268,10 @@ function AddEntryForm({ partyId, onDone }: { partyId: number; onDone: () => void
       </div>
       <div>
         <Label>Note</Label>
-        <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="optional" />
+        <div className="flex gap-2">
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="optional" />
+          <VoiceButton onResult={(t) => setNote((n) => (n ? n + " " : "") + t)} />
+        </div>
       </div>
       <Button type="submit" className="w-full">Save</Button>
     </form>
