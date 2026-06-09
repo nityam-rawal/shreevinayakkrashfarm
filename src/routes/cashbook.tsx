@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateField } from "@/components/DateField";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/cashbook")({
@@ -51,7 +52,7 @@ function Cashbook() {
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="max-w-[180px]" />
+        <div className="max-w-[180px] flex-1"><DateField value={date} onChange={setDate} /></div>
         <div className="flex gap-3 text-sm">
           <div className="rounded-lg bg-success/10 px-3 py-1.5 num font-semibold text-success">+ {fmtINR(dayIn)}</div>
           <div className="rounded-lg bg-destructive/10 px-3 py-1.5 num font-semibold text-destructive">- {fmtINR(dayOut)}</div>
@@ -130,7 +131,7 @@ function NewCashForm({ onDone, defaultDate }: { onDone: () => void; defaultDate:
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </div>
         <div>
           <Label>Amount ₹</Label>

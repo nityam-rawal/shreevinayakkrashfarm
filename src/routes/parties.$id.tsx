@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { buildLedgerPDF, shareOrDownloadPDF } from "@/lib/pdf";
+import { DateField } from "@/components/DateField";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/parties/$id")({
@@ -149,11 +150,19 @@ function PartyDetail() {
               )}
               {entries.map((e) => {
                 running += e.debit - e.credit;
+                const clickable = e.type === "invoice" && e.invoiceId;
+                const rowClass = `border-t border-border ${clickable ? "cursor-pointer hover:bg-accent/40" : ""}`;
+                const onClick = clickable
+                  ? () => navigate({ to: "/invoice/$id", params: { id: String(e.invoiceId) } })
+                  : undefined;
                 return (
-                  <tr key={e.id} className="border-t border-border">
+                  <tr key={e.id} className={rowClass} onClick={onClick}>
                     <td className="px-3 py-2 text-xs">{fmtDate(e.date)}</td>
                     <td className="px-3 py-2">
-                      <div className="text-xs font-semibold uppercase">{e.type}</div>
+                      <div className="text-xs font-semibold uppercase">
+                        {e.type}
+                        {clickable && <span className="ml-1 text-primary">→ Bill</span>}
+                      </div>
                       {e.note && <div className="text-xs text-muted-foreground">{e.note}</div>}
                     </td>
                     <td className="num px-3 py-2 text-right">{e.debit ? fmtINR(e.debit) : ""}</td>
@@ -214,7 +223,7 @@ function AddEntryForm({ partyId, onDone }: { partyId: number; onDone: () => void
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </div>
         <div>
           <Label>Amount ₹</Label>

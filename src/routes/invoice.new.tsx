@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DateField } from "@/components/DateField";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -95,7 +96,7 @@ function NewInvoice() {
         </div>
         <div>
           <Label>Date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </div>
       </div>
 
