@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VoiceButton } from "@/components/VoiceButton";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/parties/")({
@@ -152,7 +153,10 @@ function NewPartyForm({ onDone }: { onDone: () => void }) {
     <form onSubmit={submit} className="space-y-3">
       <div>
         <Label>Naam *</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        <div className="flex gap-2">
+          <Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+          <VoiceButton onResult={(t) => setName(t)} />
+        </div>
       </div>
       <div>
         <Label>Type</Label>

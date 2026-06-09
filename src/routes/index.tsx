@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect } from "react";
-import { db, seedIfEmpty, cashOnHand } from "@/lib/db";
+import { db, seedIfEmpty, cashOnHand, partyBalance } from "@/lib/db";
 import { fmtINR, todayISO } from "@/lib/format";
 import { AppShell } from "@/components/AppShell";
-import { Users, BookOpen, Boxes, FileText, Sparkles, Wrench, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Users, BookOpen, Boxes, FileText, Sparkles, Wrench, ArrowUpRight, ArrowDownRight, AlertTriangle, PackageX } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -33,6 +33,23 @@ function Dashboard() {
   );
   const todayIn = todayEntries.filter((e) => e.type === "income").reduce((a, e) => a + e.amount, 0);
   const todayOut = todayEntries.filter((e) => e.type === "expense").reduce((a, e) => a + e.amount, 0);
+
+  // Low-stock alerts
+  const lowStock = useLiveQuery(async () => {
+    const all = await db.items.where("kind").equals("stock").toArray();
+    return all.filter((i) => i.lowStockAt != null && (i.stock ?? 0) <= i.lowStockAt);
+  }, [], []);
+
+  // Top receivables (parties who owe us)
+  const topUdhaar = useLiveQuery(async () => {
+    const ps = await db.parties.toArray();
+    const withBal = await Promise.all(
+      ps.map(async (p) => ({ p, bal: await partyBalance(p.id!) })),
+    );
+    return withBal.filter((x) => x.bal > 0).sort((a, b) => b.bal - a.bal).slice(0, 3);
+  }, [], []);
+
+  const totalReceivable = topUdhaar.reduce((a, x) => a + x.bal, 0);
 
   const recentInvoices = useLiveQuery(
     () => db.invoices.orderBy("id").reverse().limit(5).toArray(),
@@ -89,6 +106,51 @@ function Dashboard() {
           );
         })}
       </div>
+
+      {(lowStock.length > 0 || topUdhaar.length > 0) && (
+        <div className="mt-8 space-y-3">
+          <h2 className="font-display text-lg font-bold">Aaj ka dhyan</h2>
+
+          {topUdhaar.length > 0 && (
+            <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2 font-display font-bold text-warning">
+                  <AlertTriangle className="h-4 w-4" /> Sabse bada udhaar
+                </div>
+                <div className="num text-sm font-bold text-warning">{fmtINR(totalReceivable)}+</div>
+              </div>
+              <div className="space-y-1.5">
+                {topUdhaar.map(({ p, bal }) => (
+                  <Link
+                    key={p.id}
+                    to="/parties/$id"
+                    params={{ id: String(p.id) }}
+                    className="flex items-center justify-between rounded-lg bg-background/60 px-3 py-2 text-sm hover:bg-background"
+                  >
+                    <span className="font-medium">{p.name}</span>
+                    <span className="num font-semibold text-destructive">{fmtINR(bal)}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {lowStock.length > 0 && (
+            <Link
+              to="/stock"
+              className="block rounded-2xl border border-destructive/30 bg-destructive/5 p-4 hover:bg-destructive/10"
+            >
+              <div className="flex items-center gap-2 font-display font-bold text-destructive">
+                <PackageX className="h-4 w-4" /> Stock kam ho gaya ({lowStock.length})
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {lowStock.slice(0, 3).map((i) => `${i.name} (${i.stock ?? 0} ${i.unit})`).join(" • ")}
+                {lowStock.length > 3 && ` +${lowStock.length - 3} aur`}
+              </div>
+            </Link>
+          )}
+        </div>
+      )}
 
       {recentInvoices.length > 0 && (
         <div className="mt-8">
