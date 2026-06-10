@@ -23,6 +23,7 @@ function SettingsPage() {
   const [newPin, setNewPin] = useState("");
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [shop, setShopState] = useState<ShopProfile>(() => getShop());
+  const [encPass, setEncPass] = useState("");
 
   function saveShopProfile() {
     saveShop(shop);
