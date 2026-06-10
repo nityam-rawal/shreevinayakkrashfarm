@@ -17,9 +17,36 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
+  const navigate = useNavigate();
+  const [aiQ, setAiQ] = useState("");
+  const aiInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     seedIfEmpty();
   }, []);
+
+  function askAI(text?: string, auto = true) {
+    const q = (text ?? aiQ).trim();
+    if (!q) { navigate({ to: "/chat" }); return; }
+    navigate({ to: "/chat", search: { q, auto: auto ? 1 : undefined } });
+  }
+
+  function startVoice() {
+    const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) { navigate({ to: "/chat" }); return; }
+    const rec = new SR() as {
+      lang: string; interimResults: boolean; continuous: boolean;
+      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+      onerror: () => void; start: () => void; stop: () => void;
+    };
+    rec.lang = "hi-IN"; rec.interimResults = false; rec.continuous = false;
+    rec.onresult = (e) => {
+      const t = e.results[0][0].transcript;
+      askAI(t, true);
+    };
+    rec.onerror = () => { navigate({ to: "/chat" }); };
+    rec.start();
+  }
 
   const partiesCount = useLiveQuery(() => db.parties.count(), [], 0);
   const itemsCount = useLiveQuery(() => db.items.count(), [], 0);
