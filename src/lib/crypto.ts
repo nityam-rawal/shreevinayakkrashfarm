@@ -3,6 +3,12 @@
 
 const ITER = 200_000;
 
+function toAB(u: Uint8Array): ArrayBuffer {
+  const ab = new ArrayBuffer(u.byteLength);
+  new Uint8Array(ab).set(u);
+  return ab;
+}
+
 async function deriveKey(pass: string, salt: Uint8Array): Promise<CryptoKey> {
   const base = await crypto.subtle.importKey(
     "raw",
@@ -12,7 +18,7 @@ async function deriveKey(pass: string, salt: Uint8Array): Promise<CryptoKey> {
     ["deriveKey"],
   );
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: ITER, hash: "SHA-256" },
+    { name: "PBKDF2", salt: toAB(salt), iterations: ITER, hash: "SHA-256" },
     base,
     { name: "AES-GCM", length: 256 },
     false,
