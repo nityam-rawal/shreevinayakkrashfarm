@@ -55,7 +55,7 @@ export async function encryptJSON(data: unknown, pass: string): Promise<Encrypte
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(pass, salt);
   const plain = new TextEncoder().encode(JSON.stringify(data));
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: toAB(iv) }, key, toAB(plain));
   return { v: 1, alg: "AES-GCM", kdf: "PBKDF2-SHA256", iter: ITER, salt: b64(salt), iv: b64(iv), ct: b64(ct) };
 }
 
