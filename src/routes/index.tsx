@@ -113,7 +113,29 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      {/* Vinayak AI search bar */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); askAI(); }}
+        className="group mt-5 flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 shadow-sm transition-all focus-within:border-primary/60 focus-within:shadow-md"
+      >
+        <Sparkles className="h-5 w-5 shrink-0 text-primary" />
+        <input
+          ref={aiInputRef}
+          value={aiQ}
+          onChange={(e) => setAiQ(e.target.value)}
+          placeholder="Vinayak AI se poochho ya bolo…"
+          className="num flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          aria-label="Vinayak AI"
+        />
+        <button type="button" onClick={startVoice} aria-label="Bolke poochho" className="rounded-full p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary">
+          <Mic className="h-4 w-4" />
+        </button>
+        <button type="submit" aria-label="Search" className="rounded-full bg-primary p-1.5 text-primary-foreground transition-transform hover:scale-105">
+          <Search className="h-4 w-4" />
+        </button>
+      </form>
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
         {tiles.map((t) => {
           const Icon = t.icon;
           return (
