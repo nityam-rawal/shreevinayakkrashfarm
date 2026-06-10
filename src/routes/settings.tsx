@@ -59,10 +59,29 @@ function SettingsPage() {
     if (mode === "replace" && !confirm("Sab kuch replace ho jayega. Pakka?")) return;
     setBusy(true);
     try {
-      const r = await importBackup(f, mode);
+      let pass: string | undefined;
+      // peek to detect encrypted
+      const head = await f.slice(0, 64).text();
+      if (head.includes('"svkf-enc"')) {
+        pass = prompt("Encrypted backup hai — passphrase daalo:") ?? undefined;
+        if (!pass) { setBusy(false); return; }
+      }
+      const r = await importBackup(f, mode, pass);
       toast.success(`Restored: ${r.parties}p / ${r.invoices}b / ${r.cash}c / ${r.ledger}l`);
     } catch (e2) {
       toast.error(e2 instanceof Error ? e2.message : "Import failed");
+    } finally { setBusy(false); }
+  }
+
+  async function onExportEncrypted() {
+    if (!encPass || encPass.length < 6) { toast.error("Passphrase 6+ chars do"); return; }
+    setBusy(true);
+    try {
+      await downloadEncryptedBackup(encPass);
+      setEncPass("");
+      toast.success("Encrypted backup ready. Passphrase yaad rakhna — bhulne pe data wapas nahi aayega.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
     } finally { setBusy(false); }
   }
 
