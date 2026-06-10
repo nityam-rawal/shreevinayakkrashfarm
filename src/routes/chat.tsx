@@ -12,6 +12,10 @@ import { ocrImage } from "@/lib/ocr";
 
 export const Route = createFileRoute("/chat")({
   head: () => ({ meta: [{ title: "AI Assistant — Offline" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    q: typeof s.q === "string" ? s.q : undefined,
+    auto: s.auto === "1" || s.auto === 1 || s.auto === true ? 1 : undefined,
+  }),
   component: ChatPage,
 });
 
