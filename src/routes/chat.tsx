@@ -191,7 +191,7 @@ function ChatPage() {
       const text = await ocrImage(f);
       toast.dismiss(tid);
       if (!text) { toast.error("Kuch padha nahi gaya"); return; }
-      setInput((prev) => (prev ? prev + "\n" : "") + text);
+      setInput((prev: string) => (prev ? prev + "\n" : "") + text);
       toast.success("Text mil gaya — review karke send karo");
       inputRef.current?.focus();
     } catch (err) {
