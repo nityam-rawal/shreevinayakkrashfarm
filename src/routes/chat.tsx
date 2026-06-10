@@ -55,19 +55,23 @@ async function applyAction(a: ParsedAction): Promise<string> {
     await db.cash.add({ date: todayISO(), type: d.type, amount: d.amount, category: d.category, note: d.note, createdAt: Date.now() });
     return `Cash ${d.type} ${fmtINR(d.amount)}`;
   }
-  const d = a.data;
-  let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
-  if (!party) {
-    const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
-    party = await db.parties.get(id);
+  if (a.action === "add_ledger") {
+    const d = a.data;
+    let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
+    if (!party) {
+      const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
+      party = await db.parties.get(id);
+    }
+    const debit = d.type === "invoice" ? Math.abs(d.amount) : 0;
+    const credit = d.type === "payment" ? Math.abs(d.amount) : 0;
+    await db.ledger.add({ partyId: party!.id!, date: todayISO(), type: d.type, debit, credit, note: d.note, createdAt: Date.now() });
+    if (d.type === "payment") {
+      await db.cash.add({ date: todayISO(), type: "income", amount: Math.abs(d.amount), category: "Party Payment", note: d.partyName, partyId: party!.id!, createdAt: Date.now() });
+    }
+    return `Khata: ${d.partyName}`;
   }
-  const debit = d.type === "invoice" ? Math.abs(d.amount) : 0;
-  const credit = d.type === "payment" ? Math.abs(d.amount) : 0;
-  await db.ledger.add({ partyId: party!.id!, date: todayISO(), type: d.type, debit, credit, note: d.note, createdAt: Date.now() });
-  if (d.type === "payment") {
-    await db.cash.add({ date: todayISO(), type: "income", amount: Math.abs(d.amount), category: "Party Payment", note: d.partyName, partyId: party!.id!, createdAt: Date.now() });
-  }
-  return `Khata: ${d.partyName}`;
+  // answer: read-only — nothing to save
+  return a.data.text;
 }
 
 function ChatPage() {
@@ -135,7 +139,7 @@ function ChatPage() {
     if (!m || m.role !== "assistant") return;
     let n = 0;
     for (let i = 0; i < m.actions.length; i++) {
-      if (m.done[i]) continue;
+      if (m.done[i] || m.actions[i].action === "answer") continue;
       try { await applyAction(m.actions[i]); n++; } catch (e) {
         toast.error(`Step ${i + 1}: ${e instanceof Error ? e.message : "fail"}`);
       }
@@ -203,10 +207,10 @@ function ChatPage() {
   }
 
   const suggestions = [
-    "Ram ko 2 brass reti badi aur 10 bag cement bheji",
-    "Suresh ne 5000 cash diya",
-    "500 ka diesel kharcha",
-    "Shyam ko 3 trip tractor bheji, 1000 paid",
+    "Aaj ka hisaab batao",
+    "Ram ka kitna udhaar hai",
+    "Stock dikhao",
+    "Ram ko 2 brass reti aur 10 bag cement bheji, 1000 paid. Suresh ne 5000 cash diya. 500 ka diesel kharcha.",
   ];
 
   return (
@@ -248,9 +252,11 @@ function ChatPage() {
                 }`}
               >
                 {m.text}
-                {m.role === "assistant" && m.actions.length > 0 && (
+                {m.role === "assistant" && m.actions.filter(a => a.action !== "answer").length > 0 && (
                   <div className="mt-3 space-y-2">
-                    {m.actions.map((a, i) => (
+                    {m.actions.map((a, i) => {
+                      if (a.action === "answer") return null;
+                      return (
                       <div key={i} className="rounded-xl border border-primary/30 bg-background p-3">
                         <div className="mb-1 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-primary">
                           <span>{a.action.replace("_", " ")}</span>
@@ -275,11 +281,12 @@ function ChatPage() {
                           </Button>
                         )}
                       </div>
-                    ))}
-                    {m.actions.length > 1 && !m.done.every(Boolean) && (
+                      );
+                    })}
+                    {m.actions.filter(a => a.action !== "answer").length > 1 && !m.done.every(Boolean) && (
                       <Button size="sm" onClick={() => applyAll(m.id)} className="w-full gap-1">
                         <CheckCircle2 className="h-4 w-4" />
-                        Save All ({m.actions.length})
+                        Save All ({m.actions.filter(a => a.action !== "answer").length})
                       </Button>
                     )}
                   </div>

@@ -1,8 +1,10 @@
-// Offline data backup/restore. Exports the full Dexie database as a
-// single JSON file the user can save anywhere (WhatsApp self-message,
-// Drive, USB, email). Restore reads the same JSON back.
+// Offline data backup/restore. Two flavours:
+//   • plain JSON (svkf-backup-YYYY-MM-DD.json)
+//   • encrypted JSON (svkf-backup-YYYY-MM-DD.enc.json) — AES-GCM + PBKDF2
+//     so even if the backup leaks (WhatsApp, Drive), data stays sealed.
 
 import { db } from "./db";
+import { encryptJSON, decryptJSON, type EncryptedBlob } from "./crypto";
 
 export interface BackupFile {
   app: "svkf";
@@ -31,26 +33,50 @@ export async function exportBackup(): Promise<BackupFile> {
   };
 }
 
-export async function downloadBackup(): Promise<void> {
-  const data = await exportBackup();
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+function trigger(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const ts = new Date().toISOString().slice(0, 10);
   a.href = url;
-  a.download = `svkf-backup-${ts}.json`;
+  a.download = name;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
 }
 
-export async function importBackup(file: File, mode: "replace" | "merge"): Promise<{
-  parties: number; ledger: number; cash: number; items: number; invoices: number;
-}> {
+export async function downloadBackup(): Promise<void> {
+  const data = await exportBackup();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const ts = new Date().toISOString().slice(0, 10);
+  trigger(blob, `svkf-backup-${ts}.json`);
+}
+
+export async function downloadEncryptedBackup(passphrase: string): Promise<void> {
+  const data = await exportBackup();
+  const enc = await encryptJSON(data, passphrase);
+  const wrap = { app: "svkf-enc", ...enc };
+  const blob = new Blob([JSON.stringify(wrap)], { type: "application/json" });
+  const ts = new Date().toISOString().slice(0, 10);
+  trigger(blob, `svkf-backup-${ts}.enc.json`);
+}
+
+export async function importBackup(
+  file: File,
+  mode: "replace" | "merge",
+  passphrase?: string,
+): Promise<{ parties: number; ledger: number; cash: number; items: number; invoices: number }> {
   const text = await file.text();
-  const data = JSON.parse(text) as BackupFile;
-  if (data.app !== "svkf") throw new Error("Yeh file is app ki backup nahi hai");
+  const raw = JSON.parse(text) as Record<string, unknown>;
+
+  let data: BackupFile;
+  if (raw.app === "svkf-enc") {
+    if (!passphrase) throw new Error("Yeh encrypted backup hai — passphrase do");
+    data = await decryptJSON<BackupFile>(raw as unknown as EncryptedBlob, passphrase);
+  } else if (raw.app === "svkf") {
+    data = raw as unknown as BackupFile;
+  } else {
+    throw new Error("Yeh file is app ki backup nahi hai");
+  }
 
   await db.transaction("rw", [db.parties, db.ledger, db.cash, db.items, db.invoices], async () => {
     if (mode === "replace") {

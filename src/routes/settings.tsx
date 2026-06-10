@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { downloadBackup, importBackup, wipeAll } from "@/lib/backup";
+import { downloadBackup, downloadEncryptedBackup, importBackup, wipeAll } from "@/lib/backup";
 import { changePin, clearPin, hasPin, setPin } from "@/lib/lock";
 import { getShop, saveShop, type ShopProfile } from "@/lib/shop";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ function SettingsPage() {
   const [newPin, setNewPin] = useState("");
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [shop, setShopState] = useState<ShopProfile>(() => getShop());
+  const [encPass, setEncPass] = useState("");
 
   function saveShopProfile() {
     saveShop(shop);
@@ -58,10 +59,29 @@ function SettingsPage() {
     if (mode === "replace" && !confirm("Sab kuch replace ho jayega. Pakka?")) return;
     setBusy(true);
     try {
-      const r = await importBackup(f, mode);
+      let pass: string | undefined;
+      // peek to detect encrypted
+      const head = await f.slice(0, 64).text();
+      if (head.includes('"svkf-enc"')) {
+        pass = prompt("Encrypted backup hai — passphrase daalo:") ?? undefined;
+        if (!pass) { setBusy(false); return; }
+      }
+      const r = await importBackup(f, mode, pass);
       toast.success(`Restored: ${r.parties}p / ${r.invoices}b / ${r.cash}c / ${r.ledger}l`);
     } catch (e2) {
       toast.error(e2 instanceof Error ? e2.message : "Import failed");
+    } finally { setBusy(false); }
+  }
+
+  async function onExportEncrypted() {
+    if (!encPass || encPass.length < 6) { toast.error("Passphrase 6+ chars do"); return; }
+    setBusy(true);
+    try {
+      await downloadEncryptedBackup(encPass);
+      setEncPass("");
+      toast.success("Encrypted backup ready. Passphrase yaad rakhna — bhulne pe data wapas nahi aayega.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
     } finally { setBusy(false); }
   }
 
@@ -153,8 +173,23 @@ function SettingsPage() {
             Pure data ki ek JSON file download karo. Apne WhatsApp pe khud ko bhej do — phone toot gaya to wahi file restore kar lo.
           </p>
           <Button onClick={onExport} disabled={busy} className="mt-3 w-full gap-2">
-            <Download className="h-4 w-4" /> Backup Download
+            <Download className="h-4 w-4" /> Plain Backup Download
           </Button>
+          <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-primary">
+              <ShieldCheck className="h-4 w-4" /> Encrypted Backup (recommended)
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              AES-256 + PBKDF2. WhatsApp/Drive leak ho jaaye to bhi koi nahi padh sakta. Passphrase yaad rakhna — bhulne pe data wapas nahi aayega.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Input type="password" placeholder="Passphrase (6+ chars)" value={encPass}
+                onChange={(e) => setEncPass(e.target.value)} />
+              <Button onClick={onExportEncrypted} disabled={busy || encPass.length < 6}>
+                Encrypt & Save
+              </Button>
+            </div>
+          </div>
         </section>
 
         {/* Restore */}

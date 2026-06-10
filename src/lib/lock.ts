@@ -1,20 +1,26 @@
-// Offline PIN gate. Stores SHA-256(salt + PIN) in localStorage.
-// PIN never leaves the device.
+// Offline PIN gate. Stores PBKDF2(SHA-256, 200k iter) hash of (salt + PIN)
+// in localStorage. PIN never leaves the device.
 //
 // Brute-force protection:
 //   - After 5 wrong attempts, lock for 60 seconds.
 //   - After 10 wrong attempts, lock for 10 minutes.
-//   - After 20 wrong attempts, lock for 1 hour (data stays — user can still
-//     restore from backup if they truly forgot the PIN; we don't wipe on
-//     wrong PINs because that itself is a denial-of-service vector).
+//   - After 20 wrong attempts, lock for 1 hour. (We don't auto-wipe — that
+//     is itself a denial-of-service vector. User can restore from backup.)
+//
+// Legacy migration: earlier builds stored sha256(salt+pin). On the next
+// successful verify with that legacy hash, we transparently upgrade to PBKDF2.
 
-const HASH_KEY = "svkf_pin_hash";
+import { pbkdf2Hex } from "./crypto";
+
+const HASH_KEY = "svkf_pin_hash";        // PBKDF2 hex
+const LEGACY_KEY = "svkf_pin_hash_v0";   // old sha256 (kept only for migration)
 const SALT_KEY = "svkf_pin_salt";
 const UNLOCK_KEY = "svkf_unlocked";
 const FAILS_KEY = "svkf_pin_fails";
 const LOCKED_UNTIL_KEY = "svkf_pin_locked_until";
+const KIND_KEY = "svkf_pin_kind"; // "pbkdf2" | "sha256"
 
-async function sha256(input: string): Promise<string> {
+async function sha256Hex(input: string): Promise<string> {
   const buf = new TextEncoder().encode(input);
   const h = await crypto.subtle.digest("SHA-256", buf);
   return Array.from(new Uint8Array(h))
@@ -39,8 +45,10 @@ export function hasPin(): boolean {
 export async function setPin(pin: string): Promise<void> {
   if (!/^\d{4,8}$/.test(pin)) throw new Error("PIN 4-8 digits ka hona chahiye");
   const salt = ensureSalt();
-  const h = await sha256(salt + pin);
+  const h = await pbkdf2Hex(pin, salt);
   localStorage.setItem(HASH_KEY, h);
+  localStorage.setItem(KIND_KEY, "pbkdf2");
+  localStorage.removeItem(LEGACY_KEY);
   localStorage.removeItem(FAILS_KEY);
   localStorage.removeItem(LOCKED_UNTIL_KEY);
   sessionStorage.setItem(UNLOCK_KEY, "1");
@@ -68,8 +76,24 @@ function applyFailPenalty(): void {
 export async function verifyPin(pin: string): Promise<boolean> {
   if (lockoutRemainingMs() > 0) return false;
   const salt = ensureSalt();
-  const h = await sha256(salt + pin);
-  const ok = h === localStorage.getItem(HASH_KEY);
+  const stored = localStorage.getItem(HASH_KEY);
+  if (!stored) return false;
+  const kind = localStorage.getItem(KIND_KEY) || "pbkdf2";
+
+  let ok = false;
+  if (kind === "pbkdf2") {
+    ok = (await pbkdf2Hex(pin, salt)) === stored;
+  } else {
+    // legacy sha256(salt+pin)
+    ok = (await sha256Hex(salt + pin)) === stored;
+    if (ok) {
+      // transparent upgrade
+      const upgraded = await pbkdf2Hex(pin, salt);
+      localStorage.setItem(HASH_KEY, upgraded);
+      localStorage.setItem(KIND_KEY, "pbkdf2");
+    }
+  }
+
   if (ok) {
     sessionStorage.setItem(UNLOCK_KEY, "1");
     localStorage.removeItem(FAILS_KEY);
@@ -88,6 +112,8 @@ export async function changePin(oldPin: string, newPin: string): Promise<void> {
 
 export function clearPin(): void {
   localStorage.removeItem(HASH_KEY);
+  localStorage.removeItem(LEGACY_KEY);
+  localStorage.removeItem(KIND_KEY);
   localStorage.removeItem(FAILS_KEY);
   localStorage.removeItem(LOCKED_UNTIL_KEY);
   sessionStorage.removeItem(UNLOCK_KEY);

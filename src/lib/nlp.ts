@@ -5,7 +5,8 @@
 // Returns a structured Action[] that the chat UI can confirm and save
 // into khata + cashbook + stock simultaneously.
 
-import { db, type Item, type Party } from "./db";
+import { db, partyBalance, cashOnHand, type Item, type Party } from "./db";
+import { fmtINR, todayISO } from "./format";
 
 export type ParsedAction =
   | {
@@ -34,6 +35,10 @@ export type ParsedAction =
         amount: number;
         note?: string;
       };
+    }
+  | {
+      action: "answer";
+      data: { text: string };
     };
 
 export interface ParseResult {
@@ -241,6 +246,86 @@ function parseSentence(
   return null;
 }
 
+// ---------- query intent (read-only synthesis) ----------
+
+const KW_QUERY = /\b(kitna|kitne|kya|kaisa|batao|bata|dikha|show|how\s+much|total|summary|hisab|hisaab|report)\b/i;
+const KW_TODAY = /\b(aaj|today|aaj\s*ka)\b/i;
+const KW_MONTH = /\b(mahine|month|is\s*mahine|this\s*month)\b/i;
+const KW_STOCK = /\b(stock|maal|inventory|kitna\s*maal)\b/i;
+const KW_UDHAAR = /\b(udhaar|udhar|baki|baaki|owes|owe|balance|khata)\b/i;
+
+function ymPrefix(): string { return new Date().toISOString().slice(0, 7); }
+
+async function tryQuery(
+  s: string, parties: Party[], items: Item[],
+): Promise<ParsedAction | null> {
+  if (!KW_QUERY.test(s) && !KW_UDHAAR.test(s) && !KW_STOCK.test(s)) return null;
+
+  // Stock summary
+  if (KW_STOCK.test(s)) {
+    const stocks = items.filter((i) => i.kind === "stock");
+    const lines = stocks
+      .sort((a, b) => (a.stock ?? 0) - (b.stock ?? 0))
+      .slice(0, 8)
+      .map((i) => `• ${i.name}: ${i.stock ?? 0} ${i.unit}${i.lowStockAt != null && (i.stock ?? 0) <= i.lowStockAt ? " ⚠️ low" : ""}`);
+    return { action: "answer", data: { text: lines.length ? `Stock:\n${lines.join("\n")}` : "Stock empty hai." } };
+  }
+
+  // Today summary / day's hisaab
+  if (KW_TODAY.test(s) || /\b(hisab|hisaab|summary)\b/i.test(s)) {
+    const today = todayISO();
+    const todayCash = (await db.cash.where("date").equals(today).toArray());
+    const inc = todayCash.filter((c) => c.type === "income").reduce((a, c) => a + c.amount, 0);
+    const exp = todayCash.filter((c) => c.type === "expense").reduce((a, c) => a + c.amount, 0);
+    const invs = (await db.invoices.where("date").equals(today).toArray());
+    const sales = invs.reduce((a, i) => a + i.total, 0);
+    const onHand = await cashOnHand();
+    return { action: "answer", data: { text:
+      `Aaj ka hisaab (${today}):\n` +
+      `• Bills: ${invs.length} (${fmtINR(sales)})\n` +
+      `• Cash aaya: ${fmtINR(inc)}\n` +
+      `• Kharcha: ${fmtINR(exp)}\n` +
+      `• Cash on hand: ${fmtINR(onHand)}`,
+    } };
+  }
+
+  // Month expense by category (e.g. "is mahine diesel kharcha")
+  if (KW_MONTH.test(s)) {
+    const ym = ymPrefix();
+    const cat = (s.match(/(diesel|petrol|fuel|salary|labour|rent|electricity|maintenance|tea|chai)/i)?.[0] || "").toLowerCase();
+    const all = (await db.cash.toArray()).filter((c) => c.date.startsWith(ym));
+    if (cat) {
+      const tot = all.filter((c) => c.type === "expense" && c.category.toLowerCase().includes(cat.slice(0, 4))).reduce((a, c) => a + c.amount, 0);
+      return { action: "answer", data: { text: `Is mahine ${cat} kharcha: ${fmtINR(tot)}` } };
+    }
+    const inc = all.filter((c) => c.type === "income").reduce((a, c) => a + c.amount, 0);
+    const exp = all.filter((c) => c.type === "expense").reduce((a, c) => a + c.amount, 0);
+    return { action: "answer", data: { text: `Is mahine: Income ${fmtINR(inc)}, Kharcha ${fmtINR(exp)}, Net ${fmtINR(inc - exp)}` } };
+  }
+
+  // Party balance / khata
+  const p = findParty(s, parties);
+  if (p && KW_UDHAAR.test(s)) {
+    const bal = await partyBalance(p.id!);
+    const txt = bal > 0
+      ? `${p.name} aap ko ${fmtINR(bal)} dena hai.`
+      : bal < 0 ? `${p.name} ko aap ${fmtINR(-bal)} dena hai.`
+      : `${p.name} ka hisaab clear hai.`;
+    return { action: "answer", data: { text: txt } };
+  }
+
+  // Total udhaar across all customers
+  if (KW_UDHAAR.test(s)) {
+    let total = 0;
+    for (const pt of parties) {
+      if (pt.type === "customer") total += await partyBalance(pt.id!);
+    }
+    return { action: "answer", data: { text: `Total udhaar (sab customer): ${fmtINR(total)}` } };
+  }
+
+  return null;
+}
+
 export async function parseCommand(text: string): Promise<ParseResult> {
   const parties = await db.parties.toArray();
   const items = await db.items.toArray();
@@ -250,6 +335,8 @@ export async function parseCommand(text: string): Promise<ParseResult> {
   const unmatched: string[] = [];
 
   for (const s of sentences) {
+    const q = await tryQuery(s, parties, items);
+    if (q) { actions.push(q); continue; }
     const a = parseSentence(s, parties, items);
     if (a) actions.push(a);
     else if (s.length > 3) unmatched.push(s);
@@ -263,13 +350,19 @@ export async function parseCommand(text: string): Promise<ParseResult> {
       parts.push(`Bill → ${a.data.partyName} (₹${Math.round(tot)})`);
     } else if (a.action === "add_cash") {
       parts.push(`${a.data.type === "income" ? "Income" : "Expense"} ₹${a.data.amount} (${a.data.category})`);
-    } else {
+    } else if (a.action === "add_ledger") {
       parts.push(`${a.data.partyName} payment ₹${a.data.amount}`);
+    } else {
+      parts.push(a.data.text);
     }
   }
-  const summary = parts.length
-    ? `Mile ${parts.length} entries:\n• ${parts.join("\n• ")}`
-    : "Kuch samajh nahi aaya. Try: 'Ram ko 2 brass reti badi bheji' ya '500 diesel kharcha'.";
+  const hasAnswerOnly = actions.length > 0 && actions.every((a) => a.action === "answer");
+  const summary = !actions.length
+    ? "Kuch samajh nahi aaya. Try: 'Ram ko 2 brass reti bheji', '500 diesel kharcha', ya 'aaj ka hisaab'."
+    : hasAnswerOnly
+      ? parts.join("\n\n")
+      : `Mile ${actions.length} entries:\n• ${parts.join("\n• ")}`;
 
   return { actions, summary, unmatched };
 }
+
