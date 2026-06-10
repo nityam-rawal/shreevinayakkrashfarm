@@ -57,7 +57,7 @@ export function AppShell({ children, title, action }: { children: ReactNode; tit
         )}
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-5">{children}</main>
+      <main key={typeof window !== "undefined" ? window.location.pathname : ""} className="mx-auto max-w-2xl px-4 py-5 animate-page-in">{children}</main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur">
         <div className="mx-auto grid max-w-2xl grid-cols-6">

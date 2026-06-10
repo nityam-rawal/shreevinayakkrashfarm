@@ -12,6 +12,10 @@ import { ocrImage } from "@/lib/ocr";
 
 export const Route = createFileRoute("/chat")({
   head: () => ({ meta: [{ title: "AI Assistant — Offline" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    q: typeof s.q === "string" ? s.q : undefined,
+    auto: s.auto === "1" || s.auto === 1 || s.auto === true ? 1 : undefined,
+  }),
   component: ChatPage,
 });
 
@@ -67,19 +71,31 @@ async function applyAction(a: ParsedAction): Promise<string> {
 }
 
 function ChatPage() {
+  const { q, auto } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(q ?? "");
   const [listening, setListening] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<unknown>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const autoFiredRef = useRef(false);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (auto && q && !autoFiredRef.current) {
+      autoFiredRef.current = true;
+      setInput(q);
+      setTimeout(() => { void submit(); navigate({ to: "/chat", search: {}, replace: true }); }, 50);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, q]);
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -175,7 +191,7 @@ function ChatPage() {
       const text = await ocrImage(f);
       toast.dismiss(tid);
       if (!text) { toast.error("Kuch padha nahi gaya"); return; }
-      setInput((prev) => (prev ? prev + "\n" : "") + text);
+      setInput((prev: string) => (prev ? prev + "\n" : "") + text);
       toast.success("Text mil gaya — review karke send karo");
       inputRef.current?.focus();
     } catch (err) {

@@ -1,10 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery } from "dexie-react-hooks";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { db, seedIfEmpty, cashOnHand, partyBalance } from "@/lib/db";
 import { fmtINR, todayISO } from "@/lib/format";
 import { AppShell } from "@/components/AppShell";
-import { Users, BookOpen, Boxes, FileText, Sparkles, Wrench, ArrowUpRight, ArrowDownRight, AlertTriangle, PackageX } from "lucide-react";
+import { Users, BookOpen, Boxes, FileText, ArrowUpRight, ArrowDownRight, AlertTriangle, PackageX, Sparkles, Mic, Search } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -17,9 +17,36 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
+  const navigate = useNavigate();
+  const [aiQ, setAiQ] = useState("");
+  const aiInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     seedIfEmpty();
   }, []);
+
+  function askAI(text?: string, auto = true) {
+    const q = (text ?? aiQ).trim();
+    if (!q) { navigate({ to: "/chat" }); return; }
+    navigate({ to: "/chat", search: { q, auto: auto ? 1 : undefined } });
+  }
+
+  function startVoice() {
+    const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) { navigate({ to: "/chat" }); return; }
+    const rec = new SR() as {
+      lang: string; interimResults: boolean; continuous: boolean;
+      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+      onerror: () => void; start: () => void; stop: () => void;
+    };
+    rec.lang = "hi-IN"; rec.interimResults = false; rec.continuous = false;
+    rec.onresult = (e) => {
+      const t = e.results[0][0].transcript;
+      askAI(t, true);
+    };
+    rec.onerror = () => { navigate({ to: "/chat" }); };
+    rec.start();
+  }
 
   const partiesCount = useLiveQuery(() => db.parties.count(), [], 0);
   const itemsCount = useLiveQuery(() => db.items.count(), [], 0);
@@ -62,8 +89,6 @@ function Dashboard() {
     { to: "/cashbook", label: "Cash Book", sub: "Daily aay-vyay", icon: BookOpen, tint: "bg-success/10 text-success" },
     { to: "/stock", label: "Stock & Services", sub: `${itemsCount} items`, icon: Boxes, tint: "bg-accent/30 text-accent-foreground" },
     { to: "/invoice/new", label: "New Bill", sub: `${invoicesCount} banaye`, icon: FileText, tint: "bg-warning/15 text-warning" },
-    { to: "/chat", label: "AI Assistant", sub: "Bolke entry karo", icon: Sparkles, tint: "bg-primary/10 text-primary" },
-    { to: "/parties", label: "Staff & Vendors", sub: "Khata + payments", icon: Wrench, tint: "bg-secondary text-secondary-foreground" },
   ] as const;
 
   return (
@@ -88,7 +113,29 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      {/* Vinayak AI search bar */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); askAI(); }}
+        className="group mt-5 flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 shadow-sm transition-all focus-within:border-primary/60 focus-within:shadow-md"
+      >
+        <Sparkles className="h-5 w-5 shrink-0 text-primary" />
+        <input
+          ref={aiInputRef}
+          value={aiQ}
+          onChange={(e) => setAiQ(e.target.value)}
+          placeholder="Vinayak AI se poochho ya bolo…"
+          className="num flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          aria-label="Vinayak AI"
+        />
+        <button type="button" onClick={startVoice} aria-label="Bolke poochho" className="rounded-full p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary">
+          <Mic className="h-4 w-4" />
+        </button>
+        <button type="submit" aria-label="Search" className="rounded-full bg-primary p-1.5 text-primary-foreground transition-transform hover:scale-105">
+          <Search className="h-4 w-4" />
+        </button>
+      </form>
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
         {tiles.map((t) => {
           const Icon = t.icon;
           return (
