@@ -173,8 +173,23 @@ function SettingsPage() {
             Pure data ki ek JSON file download karo. Apne WhatsApp pe khud ko bhej do — phone toot gaya to wahi file restore kar lo.
           </p>
           <Button onClick={onExport} disabled={busy} className="mt-3 w-full gap-2">
-            <Download className="h-4 w-4" /> Backup Download
+            <Download className="h-4 w-4" /> Plain Backup Download
           </Button>
+          <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-primary">
+              <ShieldCheck className="h-4 w-4" /> Encrypted Backup (recommended)
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              AES-256 + PBKDF2. WhatsApp/Drive leak ho jaaye to bhi koi nahi padh sakta. Passphrase yaad rakhna — bhulne pe data wapas nahi aayega.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Input type="password" placeholder="Passphrase (6+ chars)" value={encPass}
+                onChange={(e) => setEncPass(e.target.value)} />
+              <Button onClick={onExportEncrypted} disabled={busy || encPass.length < 6}>
+                Encrypt & Save
+              </Button>
+            </div>
+          </div>
         </section>
 
         {/* Restore */}
