@@ -63,7 +63,7 @@ export async function decryptJSON<T = unknown>(blob: EncryptedBlob, pass: string
   if (blob.v !== 1 || blob.alg !== "AES-GCM") throw new Error("Unsupported blob");
   const key = await deriveKey(pass, ub64(blob.salt));
   try {
-    const buf = await crypto.subtle.decrypt({ name: "AES-GCM", iv: ub64(blob.iv) }, key, ub64(blob.ct));
+    const buf = await crypto.subtle.decrypt({ name: "AES-GCM", iv: toAB(ub64(blob.iv)) }, key, toAB(ub64(blob.ct)));
     return JSON.parse(new TextDecoder().decode(buf)) as T;
   } catch {
     throw new Error("Galat passphrase ya corrupt file");
