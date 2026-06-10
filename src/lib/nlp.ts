@@ -5,7 +5,8 @@
 // Returns a structured Action[] that the chat UI can confirm and save
 // into khata + cashbook + stock simultaneously.
 
-import { db, type Item, type Party } from "./db";
+import { db, partyBalance, cashOnHand, type Item, type Party } from "./db";
+import { fmtINR, todayISO } from "./format";
 
 export type ParsedAction =
   | {
@@ -34,6 +35,10 @@ export type ParsedAction =
         amount: number;
         note?: string;
       };
+    }
+  | {
+      action: "answer";
+      data: { text: string };
     };
 
 export interface ParseResult {
