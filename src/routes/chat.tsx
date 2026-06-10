@@ -55,19 +55,23 @@ async function applyAction(a: ParsedAction): Promise<string> {
     await db.cash.add({ date: todayISO(), type: d.type, amount: d.amount, category: d.category, note: d.note, createdAt: Date.now() });
     return `Cash ${d.type} ${fmtINR(d.amount)}`;
   }
-  const d = a.data;
-  let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
-  if (!party) {
-    const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
-    party = await db.parties.get(id);
+  if (a.action === "add_ledger") {
+    const d = a.data;
+    let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
+    if (!party) {
+      const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
+      party = await db.parties.get(id);
+    }
+    const debit = d.type === "invoice" ? Math.abs(d.amount) : 0;
+    const credit = d.type === "payment" ? Math.abs(d.amount) : 0;
+    await db.ledger.add({ partyId: party!.id!, date: todayISO(), type: d.type, debit, credit, note: d.note, createdAt: Date.now() });
+    if (d.type === "payment") {
+      await db.cash.add({ date: todayISO(), type: "income", amount: Math.abs(d.amount), category: "Party Payment", note: d.partyName, partyId: party!.id!, createdAt: Date.now() });
+    }
+    return `Khata: ${d.partyName}`;
   }
-  const debit = d.type === "invoice" ? Math.abs(d.amount) : 0;
-  const credit = d.type === "payment" ? Math.abs(d.amount) : 0;
-  await db.ledger.add({ partyId: party!.id!, date: todayISO(), type: d.type, debit, credit, note: d.note, createdAt: Date.now() });
-  if (d.type === "payment") {
-    await db.cash.add({ date: todayISO(), type: "income", amount: Math.abs(d.amount), category: "Party Payment", note: d.partyName, partyId: party!.id!, createdAt: Date.now() });
-  }
-  return `Khata: ${d.partyName}`;
+  // answer: read-only — nothing to save
+  return a.data.text;
 }
 
 function ChatPage() {
