@@ -1,10 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery } from "dexie-react-hooks";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { db, seedIfEmpty, cashOnHand, partyBalance } from "@/lib/db";
 import { fmtINR, todayISO } from "@/lib/format";
 import { AppShell } from "@/components/AppShell";
-import { Users, BookOpen, Boxes, FileText, Sparkles, Wrench, ArrowUpRight, ArrowDownRight, AlertTriangle, PackageX } from "lucide-react";
+import { Users, BookOpen, Boxes, FileText, ArrowUpRight, ArrowDownRight, AlertTriangle, PackageX, Sparkles, Mic, Search } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
