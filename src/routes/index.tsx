@@ -62,8 +62,6 @@ function Dashboard() {
     { to: "/cashbook", label: "Cash Book", sub: "Daily aay-vyay", icon: BookOpen, tint: "bg-success/10 text-success" },
     { to: "/stock", label: "Stock & Services", sub: `${itemsCount} items`, icon: Boxes, tint: "bg-accent/30 text-accent-foreground" },
     { to: "/invoice/new", label: "New Bill", sub: `${invoicesCount} banaye`, icon: FileText, tint: "bg-warning/15 text-warning" },
-    { to: "/chat", label: "AI Assistant", sub: "Bolke entry karo", icon: Sparkles, tint: "bg-primary/10 text-primary" },
-    { to: "/parties", label: "Staff & Vendors", sub: "Khata + payments", icon: Wrench, tint: "bg-secondary text-secondary-foreground" },
   ] as const;
 
   return (
