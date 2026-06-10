@@ -252,9 +252,11 @@ function ChatPage() {
                 }`}
               >
                 {m.text}
-                {m.role === "assistant" && m.actions.length > 0 && (
+                {m.role === "assistant" && m.actions.filter(a => a.action !== "answer").length > 0 && (
                   <div className="mt-3 space-y-2">
-                    {m.actions.map((a, i) => (
+                    {m.actions.map((a, i) => {
+                      if (a.action === "answer") return null;
+                      return (
                       <div key={i} className="rounded-xl border border-primary/30 bg-background p-3">
                         <div className="mb-1 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-primary">
                           <span>{a.action.replace("_", " ")}</span>
@@ -279,11 +281,12 @@ function ChatPage() {
                           </Button>
                         )}
                       </div>
-                    ))}
-                    {m.actions.length > 1 && !m.done.every(Boolean) && (
+                      );
+                    })}
+                    {m.actions.filter(a => a.action !== "answer").length > 1 && !m.done.every(Boolean) && (
                       <Button size="sm" onClick={() => applyAll(m.id)} className="w-full gap-1">
                         <CheckCircle2 className="h-4 w-4" />
-                        Save All ({m.actions.length})
+                        Save All ({m.actions.filter(a => a.action !== "answer").length})
                       </Button>
                     )}
                   </div>
