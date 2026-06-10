@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { downloadBackup, importBackup, wipeAll } from "@/lib/backup";
+import { downloadBackup, downloadEncryptedBackup, importBackup, wipeAll } from "@/lib/backup";
 import { changePin, clearPin, hasPin, setPin } from "@/lib/lock";
 import { getShop, saveShop, type ShopProfile } from "@/lib/shop";
 import { toast } from "sonner";
