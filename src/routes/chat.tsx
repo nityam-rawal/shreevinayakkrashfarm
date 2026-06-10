@@ -207,10 +207,10 @@ function ChatPage() {
   }
 
   const suggestions = [
-    "Ram ko 2 brass reti badi aur 10 bag cement bheji",
-    "Suresh ne 5000 cash diya",
-    "500 ka diesel kharcha",
-    "Shyam ko 3 trip tractor bheji, 1000 paid",
+    "Aaj ka hisaab batao",
+    "Ram ka kitna udhaar hai",
+    "Stock dikhao",
+    "Ram ko 2 brass reti aur 10 bag cement bheji, 1000 paid. Suresh ne 5000 cash diya. 500 ka diesel kharcha.",
   ];
 
   return (
