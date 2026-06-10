@@ -139,7 +139,7 @@ function ChatPage() {
     if (!m || m.role !== "assistant") return;
     let n = 0;
     for (let i = 0; i < m.actions.length; i++) {
-      if (m.done[i]) continue;
+      if (m.done[i] || m.actions[i].action === "answer") continue;
       try { await applyAction(m.actions[i]); n++; } catch (e) {
         toast.error(`Step ${i + 1}: ${e instanceof Error ? e.message : "fail"}`);
       }
