@@ -5,7 +5,7 @@ import { fmtINR, fmtDate } from "@/lib/format";
 import { AppShell } from "@/components/AppShell";
 import { ArrowLeft, Share2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { buildInvoicePDF, shareOrDownloadPDF } from "@/lib/pdf";
+import { buildInvoicePDF, buildInvoiceImage, shareAsImageOrPDF } from "@/lib/pdf";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/invoice/$id")({
@@ -29,11 +29,13 @@ function InvoiceView() {
   async function share(whatsapp: boolean) {
     if (!invoice || !party) return;
     const doc = buildInvoicePDF(invoice, party);
+    const base = invoice.number.replace(/\//g, "-");
     const text = `${party.name} — Bill ${invoice.number}\nTotal: ${fmtINR(invoice.total)}\nDhanyavaad — Shree Vinayak Krashi Farm`;
     if (whatsapp) {
-      await shareOrDownloadPDF(doc, `${invoice.number.replace(/\//g, "-")}.pdf`, text);
+      const img = await buildInvoiceImage(invoice, party);
+      await shareAsImageOrPDF(img, doc, base, text);
     } else {
-      doc.save(`${invoice.number.replace(/\//g, "-")}.pdf`);
+      doc.save(`${base}.pdf`);
       toast.success("Download ho gaya");
     }
   }
