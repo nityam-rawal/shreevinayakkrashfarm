@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { db, seedIfEmpty, cashOnHand, partyBalance } from "@/lib/db";
 import { fmtINR, todayISO } from "@/lib/format";
 import { AppShell } from "@/components/AppShell";
-import { Users, BookOpen, Boxes, FileText, ArrowUpRight, ArrowDownRight, AlertTriangle, PackageX, Sparkles, Mic, Search } from "lucide-react";
+import { Users, BookOpen, Boxes, FileText, ArrowUpRight, ArrowDownRight, AlertTriangle, PackageX, Sparkles, Mic, Search, Loader2, X } from "lucide-react";
+import { parseCommand } from "@/lib/nlp";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -19,15 +20,30 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const navigate = useNavigate();
   const [aiQ, setAiQ] = useState("");
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
   const aiInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     seedIfEmpty();
   }, []);
 
-  function askAI(text?: string, auto = true) {
+  async function askAI(text?: string) {
     const q = (text ?? aiQ).trim();
     if (!q) { navigate({ to: "/chat" }); return; }
-    navigate({ to: "/chat", search: { q, auto: auto ? 1 : undefined } });
+    setAiBusy(true); setAiAnswer(null);
+    try {
+      const res = await parseCommand(q);
+      const hasActionable = res.actions.some((a) => a.action !== "answer");
+      // If the user wants to record anything (bill, payment, expense), open chat for confirm+save.
+      if (hasActionable) {
+        navigate({ to: "/chat", search: { q, auto: 1 } });
+        return;
+      }
+      // Read-only Q → answer inline, no redirect
+      setAiAnswer(res.summary);
+    } finally {
+      setAiBusy(false);
+    }
   }
 
   function startVoice() {
@@ -42,7 +58,8 @@ function Dashboard() {
     rec.lang = "hi-IN"; rec.interimResults = false; rec.continuous = false;
     rec.onresult = (e) => {
       const t = e.results[0][0].transcript;
-      askAI(t, true);
+      setAiQ(t);
+      void askAI(t);
     };
     rec.onerror = () => { navigate({ to: "/chat" }); };
     rec.start();
@@ -115,7 +132,7 @@ function Dashboard() {
 
       {/* Vinayak AI search bar */}
       <form
-        onSubmit={(e) => { e.preventDefault(); askAI(); }}
+        onSubmit={(e) => { e.preventDefault(); void askAI(); }}
         className="group mt-5 flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 shadow-sm transition-all focus-within:border-primary/60 focus-within:shadow-md"
       >
         <Sparkles className="h-5 w-5 shrink-0 text-primary" />
@@ -130,10 +147,30 @@ function Dashboard() {
         <button type="button" onClick={startVoice} aria-label="Bolke poochho" className="rounded-full p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary">
           <Mic className="h-4 w-4" />
         </button>
-        <button type="submit" aria-label="Search" className="rounded-full bg-primary p-1.5 text-primary-foreground transition-transform hover:scale-105">
-          <Search className="h-4 w-4" />
+        <button type="submit" aria-label="Search" disabled={aiBusy} className="rounded-full bg-primary p-1.5 text-primary-foreground transition-transform hover:scale-105 disabled:opacity-60">
+          {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
         </button>
       </form>
+
+      {aiAnswer && (
+        <div className="mt-3 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+          <div className="mb-1 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-primary">
+              <Sparkles className="h-3.5 w-3.5" /> Vinayak AI
+            </div>
+            <button onClick={() => setAiAnswer(null)} className="text-muted-foreground hover:text-foreground" aria-label="Close">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <pre className="num whitespace-pre-wrap text-sm">{aiAnswer}</pre>
+          <button
+            onClick={() => navigate({ to: "/chat", search: { q: aiQ } })}
+            className="mt-2 text-xs font-semibold text-primary hover:underline"
+          >
+            Aur baat karo →
+          </button>
+        </div>
+      )}
 
       <div className="mt-5 grid grid-cols-2 gap-3">
         {tiles.map((t) => {
