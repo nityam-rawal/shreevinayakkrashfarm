@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { buildLedgerPDF, shareOrDownloadPDF } from "@/lib/pdf";
+import { buildLedgerPDF, buildLedgerImage, shareAsImageOrPDF } from "@/lib/pdf";
 import { DateField } from "@/components/DateField";
 import { VoiceButton } from "@/components/VoiceButton";
 import { getShop, upiLink } from "@/lib/shop";
@@ -47,28 +47,14 @@ function PartyDetail() {
   async function sharePDF() {
     if (!party) return;
     const doc = buildLedgerPDF(party, entries, balance);
-    // Billed-format text body for WhatsApp (works even if recipient can't open PDF)
-    let run = party.openingBalance ?? 0;
-    const rows = entries.map((e) => {
-      run += e.debit - e.credit;
-      const side = e.debit ? `Dr ${fmtINR(e.debit)}` : `Cr ${fmtINR(e.credit)}`;
-      return `${fmtDate(e.date)}  ${e.type.toUpperCase().padEnd(10)}  ${side.padStart(14)}  Bal ${fmtINR(run)}${e.note ? `\n  ${e.note}` : ""}`;
-    });
-    const head =
+    const img = await buildLedgerImage(party, entries, balance);
+    const text =
       `*SHREE VINAYAK KRASHI FARM*\n` +
       `Khata Statement — *${party.name}*\n` +
       (party.phone ? `Ph: ${party.phone}\n` : "") +
-      `--------------------------------\n`;
-    const opening = (party.openingBalance ?? 0) !== 0
-      ? `Opening Balance: ${fmtINR(party.openingBalance ?? 0)}\n`
-      : "";
-    const foot =
-      `--------------------------------\n` +
-      `*${balance >= 0 ? "Lena hai (Receivable)" : "Dena hai (Payable)"}: ${fmtINR(Math.abs(balance))}*\n` +
-      `\nDate: ${fmtDate(todayISO())}\n` +
-      `— Shree Vinayak Krashi Farm`;
-    const text = head + opening + (rows.length ? rows.join("\n") + "\n" : "(koi entry nahi)\n") + foot;
-    await shareOrDownloadPDF(doc, `${party.name}-khata.pdf`, text);
+      `${balance >= 0 ? "Lena hai" : "Dena hai"}: *${fmtINR(Math.abs(balance))}*\n` +
+      `Date: ${fmtDate(todayISO())}`;
+    await shareAsImageOrPDF(img, doc, `${party.name}-khata`, text);
   }
 
   return (
