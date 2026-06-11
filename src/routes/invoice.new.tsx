@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { DateField } from "@/components/DateField";
+import { PartyCombobox } from "@/components/PartyCombobox";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -25,10 +26,10 @@ export const Route = createFileRoute("/invoice/new")({
 function NewInvoice() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const parties = useLiveQuery(() => db.parties.orderBy("name").toArray(), [], []);
   const items = useLiveQuery(() => db.items.toArray(), [], []);
 
   const [partyId, setPartyId] = useState<number | undefined>(search.partyId);
+  const [partyName, setPartyName] = useState<string>("");
   const [date, setDate] = useState(todayISO());
   const [lines, setLines] = useState<InvoiceLine[]>([{ name: "", unit: "", qty: 1, rate: 0, amount: 0 }]);
   const [discount, setDiscount] = useState("0");
@@ -54,23 +55,27 @@ function NewInvoice() {
   }
 
   async function save() {
-    if (!partyId) return toast.error("Party select karo");
+    let pid = partyId;
+    if (!pid) {
+      const nm = partyName.trim();
+      if (!nm) return toast.error("Party ka naam likho");
+      // create on the fly
+      pid = await db.parties.add({ name: nm, type: "customer", createdAt: Date.now() });
+    }
     const cleanLines = lines.filter((l) => l.name && l.qty > 0);
     if (cleanLines.length === 0) return toast.error("Items add karo");
     const number = await nextInvoiceNumber();
     const inv = {
-      number, partyId, date, lines: cleanLines, subtotal,
+      number, partyId: pid, date, lines: cleanLines, subtotal,
       discount: Number(discount) || 0, total,
       paid: Number(paid) || 0, notes: notes || undefined,
       createdAt: Date.now(),
     };
     const id = await db.invoices.add(inv);
-    // Ledger: debit party for total
-    await db.ledger.add({ partyId, date, type: "invoice", debit: total, credit: 0, note: `Bill ${number}`, invoiceId: id, createdAt: Date.now() });
-    // If paid, credit + cashbook income
+    await db.ledger.add({ partyId: pid, date, type: "invoice", debit: total, credit: 0, note: `Bill ${number}`, invoiceId: id, createdAt: Date.now() });
     if ((Number(paid) || 0) > 0) {
-      await db.ledger.add({ partyId, date, type: "payment", debit: 0, credit: Number(paid), note: `Paid for ${number}`, invoiceId: id, createdAt: Date.now() });
-      await db.cash.add({ date, type: "income", amount: Number(paid), category: "Sales", note: `${number}`, partyId, createdAt: Date.now() });
+      await db.ledger.add({ partyId: pid, date, type: "payment", debit: 0, credit: Number(paid), note: `Paid for ${number}`, invoiceId: id, createdAt: Date.now() });
+      await db.cash.add({ date, type: "income", amount: Number(paid), category: "Sales", note: `${number}`, partyId: pid, createdAt: Date.now() });
     }
     const stockUpdates = await adjustStockForLines(cleanLines, -1);
     const low = stockUpdates.filter((s) => s.low).map((s) => `${s.name}: ${s.newStock}`).join(", ");
@@ -83,16 +88,14 @@ function NewInvoice() {
       <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
         <div>
           <Label>Party *</Label>
-          <Select value={partyId ? String(partyId) : ""} onValueChange={(v) => setPartyId(Number(v))}>
-            <SelectTrigger><SelectValue placeholder="Party chuno..." /></SelectTrigger>
-            <SelectContent>
-              {parties.map((p) => (
-                <SelectItem key={p.id} value={String(p.id)}>
-                  {p.name} <span className="text-xs text-muted-foreground">({p.type})</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <PartyCombobox
+            partyId={partyId}
+            name={partyName}
+            onChange={({ partyId: pid, name }) => { setPartyId(pid); setPartyName(name); }}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Existing party chuno ya naya naam likho — save pe ban jayega.
+          </p>
         </div>
         <div>
           <Label>Date</Label>
