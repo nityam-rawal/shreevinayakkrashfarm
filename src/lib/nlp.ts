@@ -51,19 +51,33 @@ export interface ParseResult {
 
 const NUM_WORDS: Record<string, number> = {
   ek: 1, do: 2, dho: 2, teen: 3, tin: 3, char: 4, chaar: 4,
-  panch: 5, paanch: 5, chhe: 6, che: 6, saat: 7, sat: 7,
+  panch: 5, paanch: 5, chhe: 6, che: 6, chha: 6, saat: 7, sat: 7,
   aath: 8, ath: 8, nau: 9, dus: 10, das: 10,
-  bara: 12, barah: 12, pandra: 15, bees: 20, pachas: 50, pachaas: 50,
-  sau: 100, hazaar: 1000, hajar: 1000, lakh: 100000,
+  gyarah: 11, bara: 12, barah: 12, terah: 13, chaudah: 14, pandra: 15,
+  bees: 20, tees: 30, chalis: 40, chaalis: 40, pachas: 50, pachaas: 50,
+  saath: 60, sattar: 70, assi: 80, nabbe: 90,
+  sau: 100, hazaar: 1000, hajar: 1000, hazar: 1000, lakh: 100000, karod: 10000000, crore: 10000000,
+  "एक": 1, "दो": 2, "तीन": 3, "चार": 4, "पांच": 5, "पाँच": 5,
+  "छह": 6, "सात": 7, "आठ": 8, "नौ": 9, "दस": 10,
+  "बीस": 20, "पचास": 50, "सौ": 100, "हजार": 1000, "हज़ार": 1000, "लाख": 100000,
 };
 
 function extractNumber(s: string): number | null {
-  const m = s.match(/(\d+(?:[.,]\d+)?)/);
-  if (m) return parseFloat(m[1].replace(",", "."));
-  for (const w of s.toLowerCase().split(/\s+/)) {
-    if (NUM_WORDS[w] != null) return NUM_WORDS[w];
+  const kMatch = s.match(/(\d+(?:\.\d+)?)\s*k\b/i);
+  if (kMatch) return parseFloat(kMatch[1]) * 1000;
+  const m = s.match(/(\d[\d,]*(?:\.\d+)?)/);
+  if (m) return parseFloat(m[1].replace(/,/g, ""));
+  const tokens = s.toLowerCase().split(/\s+/);
+  let total = 0, cur = 0, found = false;
+  for (const w of tokens) {
+    const v = NUM_WORDS[w];
+    if (v == null) continue;
+    found = true;
+    if (v >= 100) cur = (cur || 1) * v;
+    else cur += v;
+    if (v >= 1000) { total += cur; cur = 0; }
   }
-  return null;
+  return found ? total + cur : null;
 }
 
 // fuzzy: case-insensitive substring + token overlap
