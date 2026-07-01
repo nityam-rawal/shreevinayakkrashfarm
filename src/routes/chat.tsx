@@ -154,35 +154,53 @@ function ChatPage() {
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SR) { toast.error("Voice support nahi hai is browser me"); return; }
     if (listening) {
-      (recRef.current as { stop: () => void } | null)?.stop();
+      const r = recRef.current as { _stop?: boolean; stop: () => void } | null;
+      if (r) { r._stop = true; r.stop(); }
       setListening(false);
       return;
     }
-    const rec = new SR() as {
-      lang: string; continuous: boolean; interimResults: boolean;
-      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
-      onend: () => void; onerror: (e: { error: string }) => void;
-      start: () => void; stop: () => void;
-    };
-    rec.lang = "hi-IN";
-    rec.continuous = true;
-    rec.interimResults = true;
+    // Try Hindi first; if browser errors "language-not-supported", fall back to en-IN.
+    const langs = ["hi-IN", "en-IN", "en-US"];
+    let langIdx = 0;
     let finalText = "";
-    rec.onresult = (e) => {
-      let interim = "";
-      for (let i = 0; i < e.results.length; i++) {
-        const r = e.results[i];
-        const t = r[0].transcript;
-        if ((r as unknown as { isFinal: boolean }).isFinal) finalText += t + " ";
-        else interim += t;
-      }
-      setInput((finalText + interim).trim());
+
+    const start = () => {
+      const rec = new SR() as {
+        lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
+        onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal?: boolean }> }) => void;
+        onend: () => void; onerror: (e: { error: string }) => void;
+        start: () => void; stop: () => void; _stop?: boolean;
+      };
+      rec.lang = langs[langIdx];
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.maxAlternatives = 3;
+      rec.onresult = (e) => {
+        let interim = "";
+        for (let i = 0; i < e.results.length; i++) {
+          const r = e.results[i];
+          const t = r[0].transcript;
+          if ((r as unknown as { isFinal: boolean }).isFinal) finalText += t + " ";
+          else interim += t;
+        }
+        setInput((finalText + interim).trim());
+      };
+      rec.onerror = (e) => {
+        if (e.error === "language-not-supported" && langIdx < langs.length - 1) {
+          langIdx++; return; // onend will restart with next lang
+        }
+        if (e.error === "no-speech" || e.error === "aborted") return;
+        toast.error("Voice: " + e.error);
+      };
+      rec.onend = () => {
+        if (rec._stop) { setListening(false); return; }
+        // auto-restart to keep capturing long dictations / lang fallback
+        try { rec.start(); } catch { setListening(false); }
+      };
+      recRef.current = rec;
+      try { rec.start(); setListening(true); } catch { setListening(false); }
     };
-    rec.onend = () => setListening(false);
-    rec.onerror = (e) => { toast.error("Voice: " + e.error); setListening(false); };
-    recRef.current = rec;
-    rec.start();
-    setListening(true);
+    start();
   }
 
   async function onOcrFile(e: React.ChangeEvent<HTMLInputElement>) {

@@ -51,19 +51,33 @@ export interface ParseResult {
 
 const NUM_WORDS: Record<string, number> = {
   ek: 1, do: 2, dho: 2, teen: 3, tin: 3, char: 4, chaar: 4,
-  panch: 5, paanch: 5, chhe: 6, che: 6, saat: 7, sat: 7,
+  panch: 5, paanch: 5, chhe: 6, che: 6, chha: 6, saat: 7, sat: 7,
   aath: 8, ath: 8, nau: 9, dus: 10, das: 10,
-  bara: 12, barah: 12, pandra: 15, bees: 20, pachas: 50, pachaas: 50,
-  sau: 100, hazaar: 1000, hajar: 1000, lakh: 100000,
+  gyarah: 11, bara: 12, barah: 12, terah: 13, chaudah: 14, pandra: 15,
+  bees: 20, tees: 30, chalis: 40, chaalis: 40, pachas: 50, pachaas: 50,
+  saath: 60, sattar: 70, assi: 80, nabbe: 90,
+  sau: 100, hazaar: 1000, hajar: 1000, hazar: 1000, lakh: 100000, karod: 10000000, crore: 10000000,
+  "एक": 1, "दो": 2, "तीन": 3, "चार": 4, "पांच": 5, "पाँच": 5,
+  "छह": 6, "सात": 7, "आठ": 8, "नौ": 9, "दस": 10,
+  "बीस": 20, "पचास": 50, "सौ": 100, "हजार": 1000, "हज़ार": 1000, "लाख": 100000,
 };
 
 function extractNumber(s: string): number | null {
-  const m = s.match(/(\d+(?:[.,]\d+)?)/);
-  if (m) return parseFloat(m[1].replace(",", "."));
-  for (const w of s.toLowerCase().split(/\s+/)) {
-    if (NUM_WORDS[w] != null) return NUM_WORDS[w];
+  const kMatch = s.match(/(\d+(?:\.\d+)?)\s*k\b/i);
+  if (kMatch) return parseFloat(kMatch[1]) * 1000;
+  const m = s.match(/(\d[\d,]*(?:\.\d+)?)/);
+  if (m) return parseFloat(m[1].replace(/,/g, ""));
+  const tokens = s.toLowerCase().split(/\s+/);
+  let total = 0, cur = 0, found = false;
+  for (const w of tokens) {
+    const v = NUM_WORDS[w];
+    if (v == null) continue;
+    found = true;
+    if (v >= 100) cur = (cur || 1) * v;
+    else cur += v;
+    if (v >= 1000) { total += cur; cur = 0; }
   }
-  return null;
+  return found ? total + cur : null;
 }
 
 // fuzzy: case-insensitive substring + token overlap
@@ -128,12 +142,14 @@ function splitLines(sentence: string): string[] {
     .filter(Boolean);
 }
 
-// Split full message into sentences / commands
+// Split full message into sentences / commands. Handles newlines, bullets,
+// numbered lists (1. 2)), semicolons, and connectives like "phir/then/uske baad".
 function splitSentences(text: string): string[] {
   return text
-    .split(/[.;\n]| then /i)
+    .replace(/\r/g, "")
+    .split(/\n+|[.;]|(?:^|\s)[-*•]\s+|(?:^|\s)\d+[.)]\s+| phir | then | uske baad | fir /gi)
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter((s) => s.length > 1);
 }
 
 // ---------- intent detection ----------
@@ -271,23 +287,68 @@ async function tryQuery(
     return { action: "answer", data: { text: lines.length ? `Stock:\n${lines.join("\n")}` : "Stock empty hai." } };
   }
 
-  // Today summary / day's hisaab
-  if (KW_TODAY.test(s) || /\b(hisab|hisaab|summary)\b/i.test(s)) {
-    const today = todayISO();
-    const todayCash = (await db.cash.where("date").equals(today).toArray());
+  // Today / yesterday full-day synthesis with rich breakdown
+  const isYesterday = /\b(kal|yesterday)\b/i.test(s);
+  if (KW_TODAY.test(s) || isYesterday || /\b(poora|pura|full|whole|complete|din|day)\b.*\b(hisab|hisaab|summary|report)\b/i.test(s) || /\b(hisab|hisaab|summary)\b/i.test(s)) {
+    const target = isYesterday
+      ? new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+      : todayISO();
+    const label = isYesterday ? "Kal ka" : "Aaj ka";
+    const todayCash = await db.cash.where("date").equals(target).toArray();
     const inc = todayCash.filter((c) => c.type === "income").reduce((a, c) => a + c.amount, 0);
     const exp = todayCash.filter((c) => c.type === "expense").reduce((a, c) => a + c.amount, 0);
-    const invs = (await db.invoices.where("date").equals(today).toArray());
+    const invs = await db.invoices.where("date").equals(target).toArray();
     const sales = invs.reduce((a, i) => a + i.total, 0);
-    const onHand = await cashOnHand();
-    return { action: "answer", data: { text:
-      `Aaj ka hisaab (${today}):\n` +
-      `• Bills: ${invs.length} (${fmtINR(sales)})\n` +
-      `• Cash aaya: ${fmtINR(inc)}\n` +
-      `• Kharcha: ${fmtINR(exp)}\n` +
+    const paidOnBills = invs.reduce((a, i) => a + (i.paid ?? 0), 0);
+    const udhaarGiven = sales - paidOnBills;
+    const onHand = await cashOnHand(target);
+
+    // Payments received (ledger credits) today, grouped by party
+    const payLedger = (await db.ledger.where("date").equals(target).toArray())
+      .filter((l) => l.type === "payment");
+    const partyMap = new Map<number, number>();
+    for (const l of payLedger) partyMap.set(l.partyId, (partyMap.get(l.partyId) ?? 0) + l.credit);
+    const topParties = [...partyMap.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 3)
+      .map(([pid, amt]) => {
+        const p = parties.find((x) => x.id === pid);
+        return `   – ${p?.name ?? "?"}: ${fmtINR(amt)}`;
+      });
+
+    // Expenses by category
+    const expByCat = new Map<string, number>();
+    for (const c of todayCash.filter((x) => x.type === "expense")) {
+      expByCat.set(c.category, (expByCat.get(c.category) ?? 0) + c.amount);
+    }
+    const topExp = [...expByCat.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 4)
+      .map(([cat, amt]) => `   – ${cat}: ${fmtINR(amt)}`);
+
+    // Top items sold today
+    const itemMap = new Map<string, { qty: number; unit: string; amt: number }>();
+    for (const inv of invs) for (const l of inv.lines) {
+      const prev = itemMap.get(l.name) ?? { qty: 0, unit: l.unit, amt: 0 };
+      itemMap.set(l.name, { qty: prev.qty + l.qty, unit: l.unit, amt: prev.amt + l.amount });
+    }
+    const topItems = [...itemMap.entries()]
+      .sort((a, b) => b[1].amt - a[1].amt).slice(0, 3)
+      .map(([n, v]) => `   – ${n}: ${v.qty} ${v.unit} (${fmtINR(v.amt)})`);
+
+    const parts = [
+      `${label} hisaab (${target}):`,
+      `• Bills banaye: ${invs.length} — Total ${fmtINR(sales)}`,
+      `   Paid on bills: ${fmtINR(paidOnBills)}, Naya udhaar: ${fmtINR(udhaarGiven)}`,
+      `• Cash aaya: ${fmtINR(inc)}`,
+      ...(topParties.length ? [`   Party payments:`, ...topParties] : []),
+      `• Kharcha: ${fmtINR(exp)}`,
+      ...(topExp.length ? topExp : []),
+      ...(topItems.length ? [`• Sabse zyada bika:`, ...topItems] : []),
       `• Cash on hand: ${fmtINR(onHand)}`,
-    } };
+      `• Net (income - kharcha): ${fmtINR(inc - exp)}`,
+    ];
+    return { action: "answer", data: { text: parts.join("\n") } };
   }
+
 
   // Month expense by category (e.g. "is mahine diesel kharcha")
   if (KW_MONTH.test(s)) {
