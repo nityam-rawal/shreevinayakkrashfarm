@@ -9,6 +9,7 @@ import { Send, Sparkles, CheckCircle2, Loader2, Mic, MicOff, Camera, WifiOff } f
 import { toast } from "sonner";
 import { todayISO, fmtINR } from "@/lib/format";
 import { ocrImage } from "@/lib/ocr";
+import { WhisperRecorder } from "@/components/WhisperRecorder";
 
 export const Route = createFileRoute("/chat")({
   head: () => ({ meta: [{ title: "AI Assistant — Offline" }] }),
@@ -319,9 +320,10 @@ function ChatPage() {
           <Button type="button" size="icon" variant="ghost" disabled={ocrBusy} onClick={() => fileRef.current?.click()} title="Photo / OCR">
             {ocrBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
           </Button>
-          <Button type="button" size="icon" variant={listening ? "destructive" : "ghost"} onClick={toggleVoice} title="Voice (Hindi)">
+          <Button type="button" size="icon" variant={listening ? "destructive" : "ghost"} onClick={toggleVoice} title="Quick voice (browser)">
             {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
+          <WhisperRecorder onResult={(t) => setInput((p: string) => (p ? p + " " : "") + t)} />
           <Textarea
             ref={inputRef}
             value={input}
