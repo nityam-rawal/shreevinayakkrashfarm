@@ -142,12 +142,14 @@ function splitLines(sentence: string): string[] {
     .filter(Boolean);
 }
 
-// Split full message into sentences / commands
+// Split full message into sentences / commands. Handles newlines, bullets,
+// numbered lists (1. 2)), semicolons, and connectives like "phir/then/uske baad".
 function splitSentences(text: string): string[] {
   return text
-    .split(/[.;\n]| then /i)
+    .replace(/\r/g, "")
+    .split(/\n+|[.;]|(?:^|\s)[-*•]\s+|(?:^|\s)\d+[.)]\s+| phir | then | uske baad | fir /gi)
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter((s) => s.length > 1);
 }
 
 // ---------- intent detection ----------
