@@ -323,7 +323,7 @@ function ChatPage() {
           <Button type="button" size="icon" variant={listening ? "destructive" : "ghost"} onClick={toggleVoice} title="Quick voice (browser)">
             {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
-          <WhisperRecorder onResult={(t) => setInput((p) => (p ? p + " " : "") + t)} />
+          <WhisperRecorder onResult={(t) => setInput((p: string) => (p ? p + " " : "") + t)} />
           <Textarea
             ref={inputRef}
             value={input}
