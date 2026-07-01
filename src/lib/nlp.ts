@@ -287,23 +287,68 @@ async function tryQuery(
     return { action: "answer", data: { text: lines.length ? `Stock:\n${lines.join("\n")}` : "Stock empty hai." } };
   }
 
-  // Today summary / day's hisaab
-  if (KW_TODAY.test(s) || /\b(hisab|hisaab|summary)\b/i.test(s)) {
-    const today = todayISO();
-    const todayCash = (await db.cash.where("date").equals(today).toArray());
+  // Today / yesterday full-day synthesis with rich breakdown
+  const isYesterday = /\b(kal|yesterday)\b/i.test(s);
+  if (KW_TODAY.test(s) || isYesterday || /\b(poora|pura|full|whole|complete|din|day)\b.*\b(hisab|hisaab|summary|report)\b/i.test(s) || /\b(hisab|hisaab|summary)\b/i.test(s)) {
+    const target = isYesterday
+      ? new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+      : todayISO();
+    const label = isYesterday ? "Kal ka" : "Aaj ka";
+    const todayCash = await db.cash.where("date").equals(target).toArray();
     const inc = todayCash.filter((c) => c.type === "income").reduce((a, c) => a + c.amount, 0);
     const exp = todayCash.filter((c) => c.type === "expense").reduce((a, c) => a + c.amount, 0);
-    const invs = (await db.invoices.where("date").equals(today).toArray());
+    const invs = await db.invoices.where("date").equals(target).toArray();
     const sales = invs.reduce((a, i) => a + i.total, 0);
-    const onHand = await cashOnHand();
-    return { action: "answer", data: { text:
-      `Aaj ka hisaab (${today}):\n` +
-      `• Bills: ${invs.length} (${fmtINR(sales)})\n` +
-      `• Cash aaya: ${fmtINR(inc)}\n` +
-      `• Kharcha: ${fmtINR(exp)}\n` +
+    const paidOnBills = invs.reduce((a, i) => a + (i.paid ?? 0), 0);
+    const udhaarGiven = sales - paidOnBills;
+    const onHand = await cashOnHand(target);
+
+    // Payments received (ledger credits) today, grouped by party
+    const payLedger = (await db.ledger.where("date").equals(target).toArray())
+      .filter((l) => l.type === "payment");
+    const partyMap = new Map<number, number>();
+    for (const l of payLedger) partyMap.set(l.partyId, (partyMap.get(l.partyId) ?? 0) + l.credit);
+    const topParties = [...partyMap.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 3)
+      .map(([pid, amt]) => {
+        const p = parties.find((x) => x.id === pid);
+        return `   – ${p?.name ?? "?"}: ${fmtINR(amt)}`;
+      });
+
+    // Expenses by category
+    const expByCat = new Map<string, number>();
+    for (const c of todayCash.filter((x) => x.type === "expense")) {
+      expByCat.set(c.category, (expByCat.get(c.category) ?? 0) + c.amount);
+    }
+    const topExp = [...expByCat.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 4)
+      .map(([cat, amt]) => `   – ${cat}: ${fmtINR(amt)}`);
+
+    // Top items sold today
+    const itemMap = new Map<string, { qty: number; unit: string; amt: number }>();
+    for (const inv of invs) for (const l of inv.lines) {
+      const prev = itemMap.get(l.name) ?? { qty: 0, unit: l.unit, amt: 0 };
+      itemMap.set(l.name, { qty: prev.qty + l.qty, unit: l.unit, amt: prev.amt + l.amount });
+    }
+    const topItems = [...itemMap.entries()]
+      .sort((a, b) => b[1].amt - a[1].amt).slice(0, 3)
+      .map(([n, v]) => `   – ${n}: ${v.qty} ${v.unit} (${fmtINR(v.amt)})`);
+
+    const parts = [
+      `${label} hisaab (${target}):`,
+      `• Bills banaye: ${invs.length} — Total ${fmtINR(sales)}`,
+      `   Paid on bills: ${fmtINR(paidOnBills)}, Naya udhaar: ${fmtINR(udhaarGiven)}`,
+      `• Cash aaya: ${fmtINR(inc)}`,
+      ...(topParties.length ? [`   Party payments:`, ...topParties] : []),
+      `• Kharcha: ${fmtINR(exp)}`,
+      ...(topExp.length ? topExp : []),
+      ...(topItems.length ? [`• Sabse zyada bika:`, ...topItems] : []),
       `• Cash on hand: ${fmtINR(onHand)}`,
-    } };
+      `• Net (income - kharcha): ${fmtINR(inc - exp)}`,
+    ];
+    return { action: "answer", data: { text: parts.join("\n") } };
   }
+
 
   // Month expense by category (e.g. "is mahine diesel kharcha")
   if (KW_MONTH.test(s)) {
