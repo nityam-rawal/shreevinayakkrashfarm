@@ -166,6 +166,62 @@ function SettingsPage() {
           </div>
         </section>
 
+        {/* Workspaces */}
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="flex items-center gap-2 font-display font-bold">
+            <Store className="h-4 w-4" /> Shops / Workspaces
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Har workspace ka data alag, 100% isolated. Ek phone me kai shop chala sakte ho.
+          </p>
+          <div className="mt-3 space-y-2">
+            {listWorkspaces().map((w) => {
+              const active = w.id === getActiveWorkspaceId();
+              return (
+                <div key={w.id} className="flex items-center gap-2 rounded-lg border border-border p-2">
+                  <Store className={`h-4 w-4 ${active ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className="flex-1 truncate text-sm">{w.name}</span>
+                  {active ? (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-primary"><Check className="h-3 w-3" /> Active</span>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => switchWorkspace(w.id)}>Switch</Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => {
+                    const n = prompt("Naya naam:", w.name);
+                    if (n?.trim()) { renameWorkspace(w.id, n.trim()); location.reload(); }
+                  }}>✎</Button>
+                  {!active && (
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      if (confirm(`"${w.name}" ka saara data delete? Pehle backup lo!`)) {
+                        deleteWorkspace(w.id); location.reload();
+                      }
+                    }}><Trash2 className="h-3 w-3" /></Button>
+                  )}
+                </div>
+              );
+            })}
+            <Button variant="outline" className="w-full gap-1" onClick={() => {
+              const n = prompt("Naye shop ka naam:");
+              if (n?.trim()) { const ws = createWorkspace(n.trim()); switchWorkspace(ws.id); }
+            }}><Plus className="h-4 w-4" /> Naya Shop / Workspace</Button>
+          </div>
+        </section>
+
+        {/* Whisper */}
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="flex items-center gap-2 font-display font-bold">
+            <Mic className="h-4 w-4" /> Offline Voice (Whisper)
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Whisper AI ~40MB ka model download karega (ek baar). Fir saari bhashaon me offline voice → text kaam karega.
+          </p>
+          <Button variant="outline" className="mt-3 w-full" onClick={async () => {
+            const tid = toast.loading("Whisper model download ho raha hai...");
+            try { await preloadWhisper(); toast.dismiss(tid); toast.success("Ready! Ab offline chalega."); }
+            catch (e) { toast.dismiss(tid); toast.error(e instanceof Error ? e.message : "Failed"); }
+          }}>Whisper Model Pre-download</Button>
+        </section>
+
         {/* Backup */}
         <section className="rounded-2xl border border-border bg-card p-4">
           <h2 className="flex items-center gap-2 font-display font-bold">
