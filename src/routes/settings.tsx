@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { downloadBackup, downloadEncryptedBackup, importBackup, wipeAll } from "@/lib/backup";
 import { changePin, clearPin, hasPin, setPin } from "@/lib/lock";
 import { getShop, saveShop, type ShopProfile } from "@/lib/shop";
+import { createWorkspace, deleteWorkspace, getActiveWorkspaceId, listWorkspaces, renameWorkspace, switchWorkspace } from "@/lib/workspace";
+import { preloadWhisper } from "@/lib/whisper";
 import { toast } from "sonner";
-import { Download, Upload, Trash2, ShieldCheck, KeyRound, WifiOff, Store } from "lucide-react";
+import { Download, Upload, Trash2, ShieldCheck, KeyRound, WifiOff, Store, Mic, Plus, Check } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings & Backup" }] }),
