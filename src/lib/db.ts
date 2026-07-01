@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { dbName } from "./workspace";
 
 export type PartyType = "customer" | "supplier" | "staff";
 
@@ -84,7 +85,7 @@ class AppDB extends Dexie {
   invoices!: Table<Invoice, number>;
 
   constructor() {
-    super("svkf_v1");
+    super(typeof window === "undefined" ? "svkf_v1" : dbName());
     this.version(1).stores({
       parties: "++id, name, type, createdAt",
       ledger: "++id, partyId, date, type, invoiceId, createdAt",
