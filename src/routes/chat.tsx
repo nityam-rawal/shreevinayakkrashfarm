@@ -53,7 +53,7 @@ async function applyAction(a: ParsedAction): Promise<string> {
   }
   if (a.action === "add_cash") {
     const d = a.data;
-    await db.cash.add({ date: todayISO(), type: d.type, amount: d.amount, category: d.category, note: d.note, createdAt: Date.now() });
+    await db.cash.add({ date: d.date ?? todayISO(), type: d.type, amount: d.amount, category: d.category, note: d.note, createdAt: Date.now() });
     return `Cash ${d.type} ${fmtINR(d.amount)}`;
   }
   if (a.action === "add_ledger") {
