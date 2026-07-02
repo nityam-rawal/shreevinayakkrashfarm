@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -220,6 +220,18 @@ function SettingsPage() {
             try { await preloadWhisper(); toast.dismiss(tid); toast.success("Ready! Ab offline chalega."); }
             catch (e) { toast.dismiss(tid); toast.error(e instanceof Error ? e.message : "Failed"); }
           }}>Whisper Model Pre-download</Button>
+        </section>
+
+        {/* AI Test Lab */}
+        <section className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+          <h2 className="flex items-center gap-2 font-display font-bold text-primary">
+            🧪 AI Test Lab
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Vinayak AI ko dummy data pe test karo — 15 real-world cases: bill, payment, expense,
+            Devanagari digits, typos, batch entries, queries. Fail hone pe exact reason milega.
+          </p>
+          <Link to="/ai-test"><Button variant="outline" className="mt-3 w-full">Open AI Test Lab</Button></Link>
         </section>
 
         {/* Backup */}
