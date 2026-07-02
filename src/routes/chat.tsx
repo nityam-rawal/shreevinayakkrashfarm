@@ -36,7 +36,7 @@ async function applyAction(a: ParsedAction): Promise<string> {
     const subtotal = lines.reduce((acc, l) => acc + l.amount, 0);
     const total = subtotal;
     const number = await nextInvoiceNumber();
-    const date = todayISO();
+    const date = d.date ?? todayISO();
     const invId = await db.invoices.add({
       number, partyId: party!.id!, date, lines,
       subtotal, discount: 0, total, paid: d.paid ?? 0,
