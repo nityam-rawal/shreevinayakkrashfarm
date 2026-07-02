@@ -1,8 +1,8 @@
-// 100% offline Hinglish/Hindi NLP parser for daily business commands.
-// No external API, no AI model. Pure pattern matching against the user's
-// own item catalog + party list (loaded from Dexie).
+// 100% offline Hinglish/Hindi/English NLP parser for daily business commands.
+// No external API, no AI model. Pattern matching + fuzzy match against the
+// user's own item catalog + party list (loaded from Dexie).
 //
-// Returns a structured Action[] that the chat UI can confirm and save
+// Returns structured Action[] that the chat UI can confirm and save
 // into khata + cashbook + stock simultaneously.
 
 import { db, partyBalance, cashOnHand, type Item, type Party } from "./db";
@@ -16,6 +16,7 @@ export type ParsedAction =
         lines: { name: string; unit: string; qty: number; rate: number }[];
         paid?: number;
         notes?: string;
+        date?: string;
       };
     }
   | {
@@ -25,6 +26,7 @@ export type ParsedAction =
         amount: number;
         category: string;
         note?: string;
+        date?: string;
       };
     }
   | {
@@ -34,6 +36,8 @@ export type ParsedAction =
         type: "payment" | "invoice" | "adjustment";
         amount: number;
         note?: string;
+        date?: string;
+        direction?: "in" | "out"; // in = we received, out = we paid
       };
     }
   | {
@@ -47,7 +51,35 @@ export interface ParseResult {
   unmatched: string[];
 }
 
-// ---------- helpers ----------
+// ---------- normalization ----------
+
+// Convert Devanagari / Gujarati digits to ASCII digits
+function normalizeDigits(s: string): string {
+  return s
+    .replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d)))
+    .replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d)));
+}
+
+// Common Hinglish spelling variants → canonical forms (only for parsing, not display)
+function normalizeSpelling(s: string): string {
+  return s
+    .replace(/\bbrs\b/gi, "brass")
+    .replace(/\bbori\b/gi, "bag")
+    .replace(/\bborie?s\b/gi, "bag")
+    .replace(/\btha?ela\b/gi, "bag")
+    .replace(/\bboora\b/gi, "bag")
+    .replace(/\bfera\b/gi, "trip")
+    .replace(/\bpher[ao]?\b/gi, "trip")
+    .replace(/\bghanta\b/gi, "hour")
+    .replace(/\bghante\b/gi, "hour")
+    .replace(/\bhr\b/gi, "hour")
+    .replace(/\bhrs\b/gi, "hour")
+    .replace(/\bkilo\b/gi, "kg")
+    .replace(/\bkg?s\b/gi, "kg")
+    .replace(/\brs\.?\b/gi, "")
+    .replace(/\brupees?\b/gi, "")
+    .replace(/\brupaye?\b/gi, "");
+}
 
 const NUM_WORDS: Record<string, number> = {
   ek: 1, do: 2, dho: 2, teen: 3, tin: 3, char: 4, chaar: 4,
@@ -63,11 +95,19 @@ const NUM_WORDS: Record<string, number> = {
 };
 
 function extractNumber(s: string): number | null {
-  const kMatch = s.match(/(\d+(?:\.\d+)?)\s*k\b/i);
+  const t = normalizeDigits(s);
+  // 5k / 2.5k
+  const kMatch = t.match(/(\d+(?:\.\d+)?)\s*k\b/i);
   if (kMatch) return parseFloat(kMatch[1]) * 1000;
-  const m = s.match(/(\d[\d,]*(?:\.\d+)?)/);
+  // "5 hazaar", "2.5 lakh"
+  const bigMatch = t.match(/(\d+(?:\.\d+)?)\s*(hazaar|hazar|hajar|lakh|karod|crore|सौ|हजार|लाख)/i);
+  if (bigMatch) {
+    const mult = NUM_WORDS[bigMatch[2].toLowerCase()] ?? 1;
+    return parseFloat(bigMatch[1]) * mult;
+  }
+  const m = t.match(/(\d[\d,]*(?:\.\d+)?)/);
   if (m) return parseFloat(m[1].replace(/,/g, ""));
-  const tokens = s.toLowerCase().split(/\s+/);
+  const tokens = t.toLowerCase().split(/\s+/);
   let total = 0, cur = 0, found = false;
   for (const w of tokens) {
     const v = NUM_WORDS[w];
@@ -80,18 +120,65 @@ function extractNumber(s: string): number | null {
   return found ? total + cur : null;
 }
 
-// fuzzy: case-insensitive substring + token overlap
+// Extract ALL numbers in order (for "2 brass reti 10 bag cement")
+function extractAllNumbers(s: string): number[] {
+  const t = normalizeDigits(s);
+  const out: number[] = [];
+  const re = /(\d+(?:\.\d+)?)\s*k\b|(\d+(?:\.\d+)?)\s*(hazaar|hazar|hajar|lakh|karod|crore)|(\d[\d,]*(?:\.\d+)?)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(t)) !== null) {
+    if (m[1]) out.push(parseFloat(m[1]) * 1000);
+    else if (m[2]) out.push(parseFloat(m[2]) * (NUM_WORDS[m[3].toLowerCase()] ?? 1));
+    else if (m[4]) out.push(parseFloat(m[4].replace(/,/g, "")));
+  }
+  return out;
+}
+
+// ---------- fuzzy match with Levenshtein for typo tolerance ----------
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  const al = a.length, bl = b.length;
+  if (!al) return bl;
+  if (!bl) return al;
+  const dp = new Array(bl + 1);
+  for (let j = 0; j <= bl; j++) dp[j] = j;
+  for (let i = 1; i <= al; i++) {
+    let prev = dp[0]; dp[0] = i;
+    for (let j = 1; j <= bl; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1]
+        ? prev
+        : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = tmp;
+    }
+  }
+  return dp[bl];
+}
+
 function scoreMatch(needle: string, hay: string): number {
-  const n = needle.toLowerCase();
-  const h = hay.toLowerCase();
+  const n = needle.toLowerCase().trim();
+  const h = hay.toLowerCase().trim();
+  if (!n || !h) return 0;
   if (h === n) return 100;
-  if (h.includes(n)) return 60 + n.length;
-  if (n.includes(h)) return 50 + h.length;
-  const ntok = new Set(n.split(/\s+/).filter(Boolean));
-  const htok = new Set(h.split(/[\s()]+/).filter(Boolean));
+  if (h.includes(n) && n.length >= 3) return 60 + n.length;
+  if (n.includes(h) && h.length >= 3) return 50 + h.length;
+  // Token overlap
+  const ntok = n.split(/\s+/).filter(Boolean);
+  const htok = h.split(/[\s()]+/).filter(Boolean);
   let overlap = 0;
-  for (const t of ntok) if (htok.has(t)) overlap++;
-  return overlap * 15;
+  for (const nt of ntok) {
+    for (const ht of htok) {
+      if (nt === ht) { overlap += 20; continue; }
+      if (nt.length >= 4 && ht.length >= 4) {
+        const d = levenshtein(nt, ht);
+        if (d <= Math.max(1, Math.floor(Math.min(nt.length, ht.length) / 4))) {
+          overlap += 15;
+        }
+      }
+    }
+  }
+  return overlap;
 }
 
 function findParty(text: string, parties: Party[]): Party | null {
@@ -99,19 +186,21 @@ function findParty(text: string, parties: Party[]): Party | null {
   let bestScore = 0;
   for (const p of parties) {
     const s = scoreMatch(p.name, text);
-    if (s > bestScore) {
-      bestScore = s;
-      best = p;
-    }
+    if (s > bestScore) { bestScore = s; best = p; }
   }
-  // Also try last names / first words
   if (bestScore < 30) {
+    // try first-name match with typo tolerance
     for (const p of parties) {
       const first = p.name.split(/\s+/)[0];
-      if (first && new RegExp(`\\b${first}\\b`, "i").test(text)) {
-        if (first.length * 8 > bestScore) {
-          bestScore = first.length * 8;
-          best = p;
+      if (!first || first.length < 3) continue;
+      for (const w of text.split(/\s+/)) {
+        const cw = w.replace(/[^\p{L}]/gu, "");
+        if (cw.length < 3) continue;
+        const d = levenshtein(first.toLowerCase(), cw.toLowerCase());
+        const tol = Math.max(1, Math.floor(first.length / 4));
+        if (d <= tol) {
+          const sc = 40 + (first.length - d) * 4;
+          if (sc > bestScore) { bestScore = sc; best = p; }
         }
       }
     }
@@ -126,48 +215,66 @@ function findItem(phrase: string, items: Item[]): Item | null {
     const s = scoreMatch(phrase, it.name);
     const c = it.category ? scoreMatch(phrase, it.category) * 0.6 : 0;
     const sc = Math.max(s, c);
-    if (sc > bestScore) {
-      bestScore = sc;
-      best = it;
-    }
+    if (sc > bestScore) { bestScore = sc; best = it; }
   }
   return bestScore >= 20 ? best : null;
 }
 
-// Split a sentence into "line phrases" — each one likely a single item
+// ---------- date detection ----------
+
+function parseDateFromText(s: string): string | null {
+  const t = normalizeDigits(s);
+  if (/\b(aaj|today)\b/i.test(t)) return todayISO();
+  if (/\b(kal|yesterday)\b/i.test(t)) return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (/\b(parso|day before yesterday)\b/i.test(t)) return new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+  // DD/MM or DD-MM or DD/MM/YY(YY)
+  const m = t.match(/\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b/);
+  if (m) {
+    const dd = parseInt(m[1], 10), mm = parseInt(m[2], 10);
+    let yy = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
+    if (yy < 100) yy += 2000;
+    if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12) {
+      return `${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+    }
+  }
+  return null;
+}
+
+// Split "line phrases" - each likely a single item
 function splitLines(sentence: string): string[] {
   return sentence
-    .split(/,| aur | and |\+/i)
+    .split(/,| aur | and |\+| plus /i)
     .map((s) => s.trim())
     .filter(Boolean);
 }
 
-// Split full message into sentences / commands. Handles newlines, bullets,
-// numbered lists (1. 2)), semicolons, and connectives like "phir/then/uske baad".
+// Split full message into sentences / commands
 function splitSentences(text: string): string[] {
-  return text
+  return normalizeDigits(text)
     .replace(/\r/g, "")
-    .split(/\n+|[.;]|(?:^|\s)[-*•]\s+|(?:^|\s)\d+[.)]\s+| phir | then | uske baad | fir /gi)
+    .split(/\n+|[.;।]|(?:^|\s)[-*•]\s+|(?:^|\s)\d+[.)]\s+| phir | then | uske baad | fir | baad me /gi)
     .map((s) => s.trim())
     .filter((s) => s.length > 1);
 }
 
-// ---------- intent detection ----------
+// ---------- intent keywords ----------
 
-const KW_INVOICE = /\b(bill|invoice|bhej|bheji|bheja|supply|diya|diye|de\s*do|bana|banao|parchi)\b/i;
-const KW_PAYMENT_IN = /\b(mila|mile|mili|diya|diye|cash\s+diya|payment|chukta|chuka|received|aaya|cash\s+aaya)\b/i;
-const KW_EXPENSE = /\b(kharcha|kharch|kharach|diesel|petrol|fuel|salary|tankhah|mazdoori|labour|rent|kiraya|repair|maintenance|tea|chai|paani|electricity|bijli|expense)\b/i;
-const KW_INCOME = /\b(sales|sale|income|bechi|beche|cash\s+aaya|recovery)\b/i;
-const KW_PARTY_MARKER = /\b(ko|ne|se|ka|ki)\b/i;
+const KW_INVOICE = /\b(bill|invoice|bhej|bheji|bheja|bhejo|supply|diya|diye|de\s*do|bana|banao|banai|parchi|kaat|kaato)\b/i;
+const KW_PAYMENT_IN = /\b(mila|mile|mili|payment|chukta|chuka|chukaya|received|aaya|recover|jama|deposit)\b/i;
+const KW_PAYMENT_OUT = /\b(diya\s+cash|cash\s+diya|paid\s+to|pay\s+kiya|advance\s+diya|chukaya|bhej\s+diya\s+cash)\b/i;
+const KW_EXPENSE = /\b(kharcha|kharch|kharach|diesel|petrol|fuel|salary|tankhah|mazdoori|labour|labor|rent|kiraya|repair|maintenance|tea|chai|paani|nashta|electricity|bijli|expense|kharche|puncture|toll|parking|khana|food)\b/i;
+const KW_INCOME = /\b(sales|sale|income|bechi|beche|bech\s+diya|recovery)\b/i;
+const KW_UNIT = /\b(brass|bag|trip|hour|hr|day|kg|ton|piece|pcs|meter|feet|fera|ghanta)\b/i;
 
 const EXPENSE_CATEGORY_MAP: { match: RegExp; cat: string }[] = [
   { match: /diesel|petrol|fuel/i, cat: "Diesel" },
   { match: /salary|tankhah/i, cat: "Salary" },
   { match: /mazdoori|labour|labor/i, cat: "Labour" },
   { match: /rent|kiraya/i, cat: "Rent" },
-  { match: /repair|maintenance/i, cat: "Maintenance" },
-  { match: /tea|chai|paani|nashta/i, cat: "Tea/Snacks" },
+  { match: /repair|maintenance|puncture/i, cat: "Maintenance" },
+  { match: /tea|chai|paani|nashta|khana|food/i, cat: "Tea/Snacks" },
   { match: /electricity|bijli|light/i, cat: "Electricity" },
+  { match: /toll|parking/i, cat: "Toll/Parking" },
 ];
 
 function detectExpenseCategory(s: string): string {
@@ -175,86 +282,111 @@ function detectExpenseCategory(s: string): string {
   return "Other";
 }
 
+// Parse item phrases in a sentence — handles both "2 brass reti" and "reti 2 brass"
+function extractInvoiceLines(
+  sentence: string,
+  items: Item[],
+): { name: string; unit: string; qty: number; rate: number }[] {
+  const lines: { name: string; unit: string; qty: number; rate: number }[] = [];
+  const phrases = splitLines(sentence);
+  for (const raw of phrases) {
+    const ph = raw.trim();
+    if (!ph) continue;
+    const it = findItem(ph, items);
+    if (!it) continue;
+    // qty: prefer number nearest to a unit keyword; else first number
+    const nums = extractAllNumbers(ph);
+    let qty: number | null = null;
+    const unitRe = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(${it.unit})\\b`, "i");
+    const um = ph.match(unitRe);
+    if (um) qty = parseFloat(um[1]);
+    else if (nums.length > 0) qty = nums[0];
+    // avoid picking up a "@rate" number as qty
+    const rateM = ph.match(/@\s*(\d+(?:\.\d+)?)|rate\s*(\d+(?:\.\d+)?)|per\s+\w+\s*(\d+(?:\.\d+)?)/i);
+    const rate = rateM ? parseFloat(rateM[1] || rateM[2] || rateM[3]) : it.rate;
+    if (rateM && qty != null && qty === rate && nums.length > 1) qty = nums[0];
+    if (qty == null || qty <= 0) qty = 1;
+    lines.push({ name: it.name, unit: it.unit, qty, rate });
+  }
+  return lines;
+}
+
 function parseSentence(
   sentence: string,
   parties: Party[],
   items: Item[],
 ): ParsedAction | null {
-  const s = sentence.trim();
-  if (!s) return null;
+  const raw = sentence.trim();
+  if (!raw) return null;
+  const s = normalizeSpelling(raw);
+  const date = parseDateFromText(s) ?? undefined;
 
   // ---------- expense (no party needed) ----------
-  if (KW_EXPENSE.test(s) && !KW_INVOICE.test(s)) {
+  if (KW_EXPENSE.test(s) && !KW_INVOICE.test(s) && !KW_UNIT.test(s)) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
       return {
         action: "add_cash",
-        data: {
-          type: "expense",
-          amount: amt,
-          category: detectExpenseCategory(s),
-          note: s,
-        },
+        data: { type: "expense", amount: amt, category: detectExpenseCategory(s), note: raw, date },
       };
     }
   }
 
-  // ---------- pure payment received from party ----------
+  // ---------- party-related ----------
   const party = findParty(s, parties);
-  const isPaymentLike =
-    KW_PAYMENT_IN.test(s) && !findItem(s, items) && !/brass|bag|trip|hour|kg|qty|@/i.test(s);
-  if (party && isPaymentLike) {
+
+  // Payment OUT (we paid to a supplier/staff)
+  if (party && KW_PAYMENT_OUT.test(s) && !findItem(s, items) && !KW_UNIT.test(s)) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
       return {
         action: "add_ledger",
         data: {
-          partyName: party.name,
-          type: "payment",
-          amount: amt,
-          note: s,
+          partyName: party.name, type: "payment", amount: -amt,
+          note: raw, date, direction: "out",
         },
       };
     }
   }
 
-  // ---------- invoice / bill ----------
-  if (party && (KW_INVOICE.test(s) || /\d+\s*(brass|bag|trip|hour|hr|day|kg|bori)/i.test(s))) {
-    // remove party name reference to clean line phrases
-    const withoutParty = s.replace(new RegExp(party.name.split(/\s+/)[0], "ig"), "");
-    const phrases = splitLines(withoutParty);
-    const lines: { name: string; unit: string; qty: number; rate: number }[] = [];
-    let paid = 0;
-    for (const ph of phrases) {
-      // detect "paid X" or "cash X"
-      const paidMatch = ph.match(/\b(paid|cash|advance|adv)\b[^\d]*(\d+)/i);
-      if (paidMatch) {
-        paid += parseInt(paidMatch[2], 10);
-        continue;
-      }
-      const it = findItem(ph, items);
-      if (!it) continue;
-      const qty = extractNumber(ph) ?? 1;
-      // optional explicit rate: "@5000" or "rate 5000"
-      const rateM = ph.match(/@\s*(\d+)|rate\s*(\d+)/i);
-      const rate = rateM ? parseInt(rateM[1] || rateM[2], 10) : it.rate;
-      lines.push({ name: it.name, unit: it.unit, qty, rate });
+  // Payment IN (received from party) — no items, no unit words
+  const isPaymentLike =
+    KW_PAYMENT_IN.test(s) && !findItem(s, items) && !KW_UNIT.test(s);
+  if (party && isPaymentLike) {
+    const amt = extractNumber(s) ?? 0;
+    if (amt > 0) {
+      return {
+        action: "add_ledger",
+        data: { partyName: party.name, type: "payment", amount: amt, note: raw, date, direction: "in" },
+      };
     }
+  }
+
+  // ---------- invoice / bill ----------
+  if (party && (KW_INVOICE.test(s) || KW_UNIT.test(s))) {
+    const withoutParty = s
+      .replace(new RegExp(party.name.split(/\s+/)[0], "ig"), "")
+      .replace(/\b(ko|ne|se)\b/gi, ",");
+    const lines = extractInvoiceLines(withoutParty, items);
+    // extract "paid X" / "cash X" / "advance X"
+    let paid = 0;
+    const pm = s.match(/\b(paid|cash|advance|adv|jama)\b[^\d]{0,10}(\d+)/i);
+    if (pm) paid = parseInt(pm[2], 10);
     if (lines.length > 0) {
       return {
         action: "create_invoice",
-        data: { partyName: party.name, lines, paid: paid || undefined, notes: undefined },
+        data: { partyName: party.name, lines, paid: paid || undefined, date },
       };
     }
   }
 
   // ---------- generic income ----------
-  if (KW_INCOME.test(s)) {
+  if (KW_INCOME.test(s) && !party) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
       return {
         action: "add_cash",
-        data: { type: "income", amount: amt, category: "Sales", note: s },
+        data: { type: "income", amount: amt, category: "Sales", note: raw, date },
       };
     }
   }
@@ -277,7 +409,6 @@ async function tryQuery(
 ): Promise<ParsedAction | null> {
   if (!KW_QUERY.test(s) && !KW_UDHAAR.test(s) && !KW_STOCK.test(s)) return null;
 
-  // Stock summary
   if (KW_STOCK.test(s)) {
     const stocks = items.filter((i) => i.kind === "stock");
     const lines = stocks
@@ -287,7 +418,6 @@ async function tryQuery(
     return { action: "answer", data: { text: lines.length ? `Stock:\n${lines.join("\n")}` : "Stock empty hai." } };
   }
 
-  // Today / yesterday full-day synthesis with rich breakdown
   const isYesterday = /\b(kal|yesterday)\b/i.test(s);
   if (KW_TODAY.test(s) || isYesterday || /\b(poora|pura|full|whole|complete|din|day)\b.*\b(hisab|hisaab|summary|report)\b/i.test(s) || /\b(hisab|hisaab|summary)\b/i.test(s)) {
     const target = isYesterday
@@ -303,7 +433,6 @@ async function tryQuery(
     const udhaarGiven = sales - paidOnBills;
     const onHand = await cashOnHand(target);
 
-    // Payments received (ledger credits) today, grouped by party
     const payLedger = (await db.ledger.where("date").equals(target).toArray())
       .filter((l) => l.type === "payment");
     const partyMap = new Map<number, number>();
@@ -315,7 +444,6 @@ async function tryQuery(
         return `   – ${p?.name ?? "?"}: ${fmtINR(amt)}`;
       });
 
-    // Expenses by category
     const expByCat = new Map<string, number>();
     for (const c of todayCash.filter((x) => x.type === "expense")) {
       expByCat.set(c.category, (expByCat.get(c.category) ?? 0) + c.amount);
@@ -324,7 +452,6 @@ async function tryQuery(
       .sort((a, b) => b[1] - a[1]).slice(0, 4)
       .map(([cat, amt]) => `   – ${cat}: ${fmtINR(amt)}`);
 
-    // Top items sold today
     const itemMap = new Map<string, { qty: number; unit: string; amt: number }>();
     for (const inv of invs) for (const l of inv.lines) {
       const prev = itemMap.get(l.name) ?? { qty: 0, unit: l.unit, amt: 0 };
@@ -349,8 +476,6 @@ async function tryQuery(
     return { action: "answer", data: { text: parts.join("\n") } };
   }
 
-
-  // Month expense by category (e.g. "is mahine diesel kharcha")
   if (KW_MONTH.test(s)) {
     const ym = ymPrefix();
     const cat = (s.match(/(diesel|petrol|fuel|salary|labour|rent|electricity|maintenance|tea|chai)/i)?.[0] || "").toLowerCase();
@@ -364,7 +489,6 @@ async function tryQuery(
     return { action: "answer", data: { text: `Is mahine: Income ${fmtINR(inc)}, Kharcha ${fmtINR(exp)}, Net ${fmtINR(inc - exp)}` } };
   }
 
-  // Party balance / khata
   const p = findParty(s, parties);
   if (p && KW_UDHAAR.test(s)) {
     const bal = await partyBalance(p.id!);
@@ -375,7 +499,6 @@ async function tryQuery(
     return { action: "answer", data: { text: txt } };
   }
 
-  // Total udhaar across all customers
   if (KW_UDHAAR.test(s)) {
     let total = 0;
     for (const pt of parties) {
@@ -403,7 +526,6 @@ export async function parseCommand(text: string): Promise<ParseResult> {
     else if (s.length > 3) unmatched.push(s);
   }
 
-  // build summary
   const parts: string[] = [];
   for (const a of actions) {
     if (a.action === "create_invoice") {
@@ -412,7 +534,8 @@ export async function parseCommand(text: string): Promise<ParseResult> {
     } else if (a.action === "add_cash") {
       parts.push(`${a.data.type === "income" ? "Income" : "Expense"} ₹${a.data.amount} (${a.data.category})`);
     } else if (a.action === "add_ledger") {
-      parts.push(`${a.data.partyName} payment ₹${a.data.amount}`);
+      const dir = a.data.direction === "out" ? "paid to" : "payment from";
+      parts.push(`${a.data.partyName} ${dir} ₹${Math.abs(a.data.amount)}`);
     } else {
       parts.push(a.data.text);
     }
@@ -427,3 +550,5 @@ export async function parseCommand(text: string): Promise<ParseResult> {
   return { actions, summary, unmatched };
 }
 
+// ---------- exported helpers for the test lab ----------
+export const _internal = { extractNumber, extractAllNumbers, parseDateFromText, normalizeDigits, levenshtein };
