@@ -13,6 +13,7 @@ import { Route as StockRouteImport } from './routes/stock'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CashbookRouteImport } from './routes/cashbook'
+import { Route as AiTestRouteImport } from './routes/ai-test'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PartiesIndexRouteImport } from './routes/parties.index'
 import { Route as PartiesIdRouteImport } from './routes/parties.$id'
@@ -37,6 +38,11 @@ const ChatRoute = ChatRouteImport.update({
 const CashbookRoute = CashbookRouteImport.update({
   id: '/cashbook',
   path: '/cashbook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiTestRoute = AiTestRouteImport.update({
+  id: '/ai-test',
+  path: '/ai-test',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -67,6 +73,7 @@ const InvoiceIdRoute = InvoiceIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai-test': typeof AiTestRoute
   '/cashbook': typeof CashbookRoute
   '/chat': typeof ChatRoute
   '/settings': typeof SettingsRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai-test': typeof AiTestRoute
   '/cashbook': typeof CashbookRoute
   '/chat': typeof ChatRoute
   '/settings': typeof SettingsRoute
@@ -90,6 +98,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai-test': typeof AiTestRoute
   '/cashbook': typeof CashbookRoute
   '/chat': typeof ChatRoute
   '/settings': typeof SettingsRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai-test'
     | '/cashbook'
     | '/chat'
     | '/settings'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ai-test'
     | '/cashbook'
     | '/chat'
     | '/settings'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ai-test'
     | '/cashbook'
     | '/chat'
     | '/settings'
@@ -137,6 +149,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiTestRoute: typeof AiTestRoute
   CashbookRoute: typeof CashbookRoute
   ChatRoute: typeof ChatRoute
   SettingsRoute: typeof SettingsRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/cashbook'
       fullPath: '/cashbook'
       preLoaderRoute: typeof CashbookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-test': {
+      id: '/ai-test'
+      path: '/ai-test'
+      fullPath: '/ai-test'
+      preLoaderRoute: typeof AiTestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -217,6 +237,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiTestRoute: AiTestRoute,
   CashbookRoute: CashbookRoute,
   ChatRoute: ChatRoute,
   SettingsRoute: SettingsRoute,

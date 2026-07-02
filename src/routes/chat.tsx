@@ -58,18 +58,25 @@ async function applyAction(a: ParsedAction): Promise<string> {
   }
   if (a.action === "add_ledger") {
     const d = a.data;
+    const date = d.date ?? todayISO();
     let party = await db.parties.where("name").equalsIgnoreCase(d.partyName).first();
     if (!party) {
       const id = await db.parties.add({ name: d.partyName, type: "customer", createdAt: Date.now() });
       party = await db.parties.get(id);
     }
-    const debit = d.type === "invoice" ? Math.abs(d.amount) : 0;
-    const credit = d.type === "payment" ? Math.abs(d.amount) : 0;
-    await db.ledger.add({ partyId: party!.id!, date: todayISO(), type: d.type, debit, credit, note: d.note, createdAt: Date.now() });
+    const isOut = d.direction === "out" || d.amount < 0;
+    const abs = Math.abs(d.amount);
+    const debit = d.type === "invoice" ? abs : isOut ? abs : 0;
+    const credit = d.type === "payment" && !isOut ? abs : 0;
+    await db.ledger.add({ partyId: party!.id!, date, type: d.type, debit, credit, note: d.note, createdAt: Date.now() });
     if (d.type === "payment") {
-      await db.cash.add({ date: todayISO(), type: "income", amount: Math.abs(d.amount), category: "Party Payment", note: d.partyName, partyId: party!.id!, createdAt: Date.now() });
+      await db.cash.add({
+        date, type: isOut ? "expense" : "income", amount: abs,
+        category: isOut ? "Party Payment Out" : "Party Payment",
+        note: d.partyName, partyId: party!.id!, createdAt: Date.now(),
+      });
     }
-    return `Khata: ${d.partyName}`;
+    return `Khata: ${d.partyName} ${isOut ? "(paid out)" : "(received)"}`;
   }
   // answer: read-only — nothing to save
   return a.data.text;
