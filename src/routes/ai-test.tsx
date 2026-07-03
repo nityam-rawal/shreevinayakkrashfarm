@@ -194,7 +194,7 @@ function AiTestPage() {
             <Button variant="outline" onClick={seed} disabled={running}>
               Seed Dummy Data Only
             </Button>
-            <Link to="/chat"><Button variant="outline">Try in Chat →</Button></Link>
+            <Link to="/chat" search={{ q: undefined, auto: undefined }}><Button variant="outline">Try in Chat →</Button></Link>
           </div>
           {seeded && (
             <p className="mt-2 text-[11px] text-success">✓ Dummy data ready. Ab /chat pe jaake "Ram ka udhaar batao" try karo.</p>
