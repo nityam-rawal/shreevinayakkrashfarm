@@ -49,7 +49,7 @@ function Dashboard() {
   function startVoice() {
     const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) { navigate({ to: "/chat" }); return; }
+    if (!SR) { navigate({ to: "/chat", search: { q: undefined, auto: undefined } }); return; }
     const rec = new SR() as {
       lang: string; interimResults: boolean; continuous: boolean;
       onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
