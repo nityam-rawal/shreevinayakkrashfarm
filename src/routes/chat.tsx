@@ -9,7 +9,7 @@ import { Send, Sparkles, CheckCircle2, Loader2, Mic, MicOff, Camera, WifiOff } f
 import { toast } from "sonner";
 import { todayISO, fmtINR } from "@/lib/format";
 import { ocrImage } from "@/lib/ocr";
-import { WhisperRecorder } from "@/components/WhisperRecorder";
+import { VoiceDictation } from "@/components/VoiceDictation";
 
 export const Route = createFileRoute("/chat")({
   head: () => ({ meta: [{ title: "AI Assistant — Offline" }] }),
@@ -322,15 +322,17 @@ function ChatPage() {
           ))}
         </div>
 
-        <form onSubmit={submit} className="sticky bottom-20 mt-2 flex gap-2 rounded-2xl border border-border bg-card p-2 shadow-md">
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onOcrFile} className="hidden" />
-          <Button type="button" size="icon" variant="ghost" disabled={ocrBusy} onClick={() => fileRef.current?.click()} title="Photo / OCR">
-            {ocrBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-          </Button>
-          <Button type="button" size="icon" variant={listening ? "destructive" : "ghost"} onClick={toggleVoice} title="Quick voice (browser)">
-            {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
-          <WhisperRecorder onResult={(t) => setInput((p: string) => (p ? p + " " : "") + t)} />
+        <div className="sticky bottom-20 mt-2 space-y-2">
+          <VoiceDictation onResult={(t: string) => setInput(t)} />
+
+          <form onSubmit={submit} className="flex gap-2 rounded-2xl border border-border bg-card p-2 shadow-md">
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onOcrFile} className="hidden" />
+            <Button type="button" size="icon" variant="ghost" disabled={ocrBusy} onClick={() => fileRef.current?.click()} title="Photo / OCR">
+              {ocrBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            </Button>
+            <Button type="button" size="icon" variant={listening ? "destructive" : "ghost"} onClick={toggleVoice} title="Quick voice (browser)">
+              {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
           <Textarea
             ref={inputRef}
             value={input}
@@ -345,8 +347,10 @@ function ChatPage() {
           <Button type="submit" disabled={!input.trim()} size="icon">
             <Send className="h-4 w-4" />
           </Button>
-        </form>
+          </form>
+        </div>
       </div>
+
     </AppShell>
   );
 }

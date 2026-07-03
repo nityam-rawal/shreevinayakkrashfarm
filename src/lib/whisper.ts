@@ -53,6 +53,12 @@ async function toMono16k(blob: Blob): Promise<Float32Array> {
  */
 export async function transcribeBlob(blob: Blob, language?: string): Promise<string> {
   const audio = await toMono16k(blob);
+  return transcribePcm(audio, language);
+}
+
+/** Transcribe raw 16 kHz mono Float32 PCM (fast path — no decode). */
+export async function transcribePcm(audio: Float32Array, language?: string): Promise<string> {
+  if (audio.length < 16000 * 0.3) return ""; // <300ms — skip
   const asr = await getPipeline();
   const out = await asr(audio, {
     task: "transcribe",
