@@ -29,7 +29,7 @@ function Dashboard() {
 
   async function askAI(text?: string) {
     const q = (text ?? aiQ).trim();
-    if (!q) { navigate({ to: "/chat" }); return; }
+    if (!q) { navigate({ to: "/chat", search: { q: undefined, auto: undefined } }); return; }
     setAiBusy(true); setAiAnswer(null);
     try {
       const res = await parseCommand(q);
