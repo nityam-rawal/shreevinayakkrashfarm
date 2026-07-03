@@ -29,7 +29,7 @@ function Dashboard() {
 
   async function askAI(text?: string) {
     const q = (text ?? aiQ).trim();
-    if (!q) { navigate({ to: "/chat" }); return; }
+    if (!q) { navigate({ to: "/chat", search: { q: undefined, auto: undefined } }); return; }
     setAiBusy(true); setAiAnswer(null);
     try {
       const res = await parseCommand(q);
@@ -49,7 +49,7 @@ function Dashboard() {
   function startVoice() {
     const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) { navigate({ to: "/chat" }); return; }
+    if (!SR) { navigate({ to: "/chat", search: { q: undefined, auto: undefined } }); return; }
     const rec = new SR() as {
       lang: string; interimResults: boolean; continuous: boolean;
       onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
@@ -61,7 +61,7 @@ function Dashboard() {
       setAiQ(t);
       void askAI(t);
     };
-    rec.onerror = () => { navigate({ to: "/chat" }); };
+    rec.onerror = () => { navigate({ to: "/chat", search: { q: undefined, auto: undefined } }); };
     rec.start();
   }
 
@@ -164,7 +164,7 @@ function Dashboard() {
           </div>
           <pre className="num whitespace-pre-wrap text-sm">{aiAnswer}</pre>
           <button
-            onClick={() => navigate({ to: "/chat", search: { q: aiQ } })}
+            onClick={() => navigate({ to: "/chat", search: { q: aiQ, auto: undefined } })}
             className="mt-2 text-xs font-semibold text-primary hover:underline"
           >
             Aur baat karo →

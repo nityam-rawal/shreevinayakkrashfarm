@@ -104,7 +104,7 @@ function ChatPage() {
     if (auto && q && !autoFiredRef.current) {
       autoFiredRef.current = true;
       setInput(q);
-      setTimeout(() => { void submit(); navigate({ to: "/chat", search: {}, replace: true }); }, 50);
+      setTimeout(() => { void submit(); navigate({ to: "/chat", search: { q: undefined, auto: undefined }, replace: true }); }, 50);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, q]);
