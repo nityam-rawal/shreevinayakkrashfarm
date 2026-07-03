@@ -322,19 +322,17 @@ function ChatPage() {
           ))}
         </div>
 
-        <form onSubmit={submit} className="sticky bottom-20 mt-2 flex gap-2 rounded-2xl border border-border bg-card p-2 shadow-md">
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onOcrFile} className="hidden" />
-          <Button type="button" size="icon" variant="ghost" disabled={ocrBusy} onClick={() => fileRef.current?.click()} title="Photo / OCR">
-            {ocrBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-          </Button>
-          <Button type="button" size="icon" variant={listening ? "destructive" : "ghost"} onClick={toggleVoice} title="Quick voice (browser)">
-            {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
-          <VoiceDictation
-            compact
-            onResult={(t: string) => setInput(t)}
-            className="hidden sm:flex"
-          />
+        <div className="sticky bottom-20 mt-2 space-y-2">
+          <VoiceDictation onResult={(t: string) => setInput(t)} />
+
+          <form onSubmit={submit} className="flex gap-2 rounded-2xl border border-border bg-card p-2 shadow-md">
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onOcrFile} className="hidden" />
+            <Button type="button" size="icon" variant="ghost" disabled={ocrBusy} onClick={() => fileRef.current?.click()} title="Photo / OCR">
+              {ocrBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            </Button>
+            <Button type="button" size="icon" variant={listening ? "destructive" : "ghost"} onClick={toggleVoice} title="Quick voice (browser)">
+              {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
           <Textarea
             ref={inputRef}
             value={input}
