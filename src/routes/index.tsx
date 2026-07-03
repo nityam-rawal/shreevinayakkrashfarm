@@ -164,7 +164,7 @@ function Dashboard() {
           </div>
           <pre className="num whitespace-pre-wrap text-sm">{aiAnswer}</pre>
           <button
-            onClick={() => navigate({ to: "/chat", search: { q: aiQ } })}
+            onClick={() => navigate({ to: "/chat", search: { q: aiQ, auto: undefined } })}
             className="mt-2 text-xs font-semibold text-primary hover:underline"
           >
             Aur baat karo →
