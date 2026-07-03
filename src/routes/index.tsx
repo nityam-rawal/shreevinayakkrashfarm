@@ -61,7 +61,7 @@ function Dashboard() {
       setAiQ(t);
       void askAI(t);
     };
-    rec.onerror = () => { navigate({ to: "/chat" }); };
+    rec.onerror = () => { navigate({ to: "/chat", search: { q: undefined, auto: undefined } }); };
     rec.start();
   }
 
