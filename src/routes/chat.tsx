@@ -237,11 +237,38 @@ function ChatPage() {
     }
   }
 
+  async function runSynthesis() {
+    const text = input.trim();
+    if (!text || text.length < 8) { toast.error("Pehle poora din ka hisab likho ya bolo."); return; }
+    setSynthBusy(true);
+    const tid = toast.loading("Vinayak AI analyze kar raha hai...");
+    try {
+      const res = await synthesizeDay(text);
+      toast.dismiss(tid);
+      setSynth(res);
+      if (res.planned.length === 0 && res.answers.length === 0) {
+        toast.error("Kuch actionable nahi mila. Try: 'Ram ko 2 brass reti bheji, Suresh ne 5000 diya, 500 diesel'.");
+        return;
+      }
+      if (res.planned.length === 0 && res.answers.length > 0) {
+        // Only queries — reply inline
+        const reply: ChatMsg = { id: crypto.randomUUID(), role: "assistant", text: res.answers.join("\n\n"), actions: [], done: [] };
+        setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", text }, reply]);
+        setInput("");
+        return;
+      }
+      setSynthOpen(true);
+    } catch (e) {
+      toast.dismiss(tid);
+      toast.error(e instanceof Error ? e.message : "Synthesis failed");
+    } finally { setSynthBusy(false); }
+  }
+
   const suggestions = [
     "Aaj ka hisaab batao",
     "Ram ka kitna udhaar hai",
     "Stock dikhao",
-    "Ram ko 2 brass reti aur 10 bag cement bheji, 1000 paid. Suresh ne 5000 cash diya. 500 ka diesel kharcha.",
+    "Ram ko 2 brass reti aur 10 bag cement bheji, 1000 paid. Suresh ne 5000 cash diya. 500 ka diesel kharcha. Mohan ko 2000 advance diya.",
   ];
 
   return (
