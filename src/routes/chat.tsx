@@ -2,10 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { db, nextInvoiceNumber, adjustStockForLines } from "@/lib/db";
 import { parseCommand, type ParsedAction } from "@/lib/nlp";
+import { synthesizeDay, type SynthesisResult } from "@/lib/agent";
+import { AgentConfirmSheet } from "@/components/AgentConfirmSheet";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Sparkles, CheckCircle2, Loader2, Mic, MicOff, Camera, WifiOff } from "lucide-react";
+import { Send, Sparkles, CheckCircle2, Loader2, Mic, MicOff, Camera, WifiOff, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { todayISO, fmtINR } from "@/lib/format";
 import { ocrImage } from "@/lib/ocr";
@@ -89,6 +91,9 @@ function ChatPage() {
   const [input, setInput] = useState(q ?? "");
   const [listening, setListening] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
+  const [synth, setSynth] = useState<SynthesisResult | null>(null);
+  const [synthOpen, setSynthOpen] = useState(false);
+  const [synthBusy, setSynthBusy] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<unknown>(null);
@@ -232,11 +237,38 @@ function ChatPage() {
     }
   }
 
+  async function runSynthesis() {
+    const text = input.trim();
+    if (!text || text.length < 8) { toast.error("Pehle poora din ka hisab likho ya bolo."); return; }
+    setSynthBusy(true);
+    const tid = toast.loading("Vinayak AI analyze kar raha hai...");
+    try {
+      const res = await synthesizeDay(text);
+      toast.dismiss(tid);
+      setSynth(res);
+      if (res.planned.length === 0 && res.answers.length === 0) {
+        toast.error("Kuch actionable nahi mila. Try: 'Ram ko 2 brass reti bheji, Suresh ne 5000 diya, 500 diesel'.");
+        return;
+      }
+      if (res.planned.length === 0 && res.answers.length > 0) {
+        // Only queries — reply inline
+        const reply: ChatMsg = { id: crypto.randomUUID(), role: "assistant", text: res.answers.join("\n\n"), actions: [], done: [] };
+        setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", text }, reply]);
+        setInput("");
+        return;
+      }
+      setSynthOpen(true);
+    } catch (e) {
+      toast.dismiss(tid);
+      toast.error(e instanceof Error ? e.message : "Synthesis failed");
+    } finally { setSynthBusy(false); }
+  }
+
   const suggestions = [
     "Aaj ka hisaab batao",
     "Ram ka kitna udhaar hai",
     "Stock dikhao",
-    "Ram ko 2 brass reti aur 10 bag cement bheji, 1000 paid. Suresh ne 5000 cash diya. 500 ka diesel kharcha.",
+    "Ram ko 2 brass reti aur 10 bag cement bheji, 1000 paid. Suresh ne 5000 cash diya. 500 ka diesel kharcha. Mohan ko 2000 advance diya.",
   ];
 
   return (
@@ -325,6 +357,19 @@ function ChatPage() {
         <div className="sticky bottom-20 mt-2 space-y-2">
           <VoiceDictation onResult={(t: string) => setInput(t)} />
 
+          {input.trim().length > 20 && (
+            <Button
+              type="button"
+              onClick={runSynthesis}
+              disabled={synthBusy}
+              variant="secondary"
+              className="w-full gap-1.5 border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+            >
+              {synthBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
+              Din bhar ka hisab synthesize karo
+            </Button>
+          )}
+
           <form onSubmit={submit} className="flex gap-2 rounded-2xl border border-border bg-card p-2 shadow-md">
             <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onOcrFile} className="hidden" />
             <Button type="button" size="icon" variant="ghost" disabled={ocrBusy} onClick={() => fileRef.current?.click()} title="Photo / OCR">
@@ -340,7 +385,7 @@ function ChatPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
             }}
-            placeholder="Bolo, photo daalo, ya likho..."
+            placeholder="Bolo, photo daalo, ya poora din ka hisab likho..."
             rows={1}
             className="min-h-[44px] resize-none border-0 focus-visible:ring-0"
           />
@@ -350,6 +395,21 @@ function ChatPage() {
           </form>
         </div>
       </div>
+
+      <AgentConfirmSheet
+        open={synthOpen}
+        onOpenChange={setSynthOpen}
+        result={synth}
+        onDone={(summary) => {
+          setInput("");
+          setMessages((m) => [...m, {
+            id: crypto.randomUUID(), role: "assistant",
+            text: `✓ Din bhar ka hisab save ho gaya:\n${summary}`,
+            actions: [], done: [],
+          }]);
+        }}
+      />
+
 
     </AppShell>
   );
