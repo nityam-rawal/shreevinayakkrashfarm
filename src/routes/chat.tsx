@@ -91,6 +91,9 @@ function ChatPage() {
   const [input, setInput] = useState(q ?? "");
   const [listening, setListening] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
+  const [synth, setSynth] = useState<SynthesisResult | null>(null);
+  const [synthOpen, setSynthOpen] = useState(false);
+  const [synthBusy, setSynthBusy] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<unknown>(null);
