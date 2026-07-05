@@ -368,8 +368,7 @@ function isNameToken(token: string): boolean {
 
 function splitCompoundClauses(sentence: string): string[] {
   const expanded = sentence
-    .replace(/\b(\d[\d,]*(?:\.\d+)?)\s+(?=(?:ka\s+)?(?:diesel|petrol|fuel|chai|nashta|labour|rent|bijli)\b)/gi, ". $1 ")
-    .replace(/\b((?:[\p{L} .'-]+?)\s+(?:ko|ne|se)\s+\d[\d,]*(?:\.\d+)?\s+(?:cash\s+)?(?:diya|mila|liya|payment|advance|paid|chukaya))\s+(?=(?:\p{L}+\s+)?\d)/giu, "$1. ");
+    .replace(/\b(\d[\d,]*(?:\.\d+)?)\s+(?=(?:ka\s+)?(?:diesel|petrol|fuel|chai|nashta|labour|rent|bijli)\b)/gi, ". $1 ");
   if (expanded !== sentence) return expanded.split(/[.;।]/).map((s) => s.trim()).filter(Boolean);
   const tokens = sentence.split(/\s+/).filter(Boolean);
   const starts = [0];
