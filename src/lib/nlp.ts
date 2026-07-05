@@ -526,7 +526,7 @@ function parseSentence(
   }
 
   // ---------- generic income ----------
-  if (KW_INCOME.test(s) && !party) {
+  if (KW_INCOME.test(s) && !partyName) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
       return {
