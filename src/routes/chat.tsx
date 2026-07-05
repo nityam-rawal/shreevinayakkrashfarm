@@ -379,7 +379,7 @@ function ChatPage() {
           {input.trim().length > 20 && (
             <Button
               type="button"
-              onClick={runSynthesis}
+              onClick={() => void runSynthesis()}
               disabled={synthBusy}
               variant="secondary"
               className="w-full gap-1.5 border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
