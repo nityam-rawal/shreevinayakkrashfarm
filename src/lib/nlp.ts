@@ -60,9 +60,64 @@ function normalizeDigits(s: string): string {
     .replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d)));
 }
 
+const HINDI_BUSINESS_WORDS: [RegExp, string][] = [
+  [/आज/g, " aaj "], [/कल/g, " kal "], [/परसों/g, " parso "],
+  [/हिसाब|हिसाब/g, " hisab "], [/खाता/g, " khata "], [/उधार|उधारी|बाकी|बकाया/g, " udhaar "],
+  [/स्टॉक|माल/g, " stock "], [/बिल|रसीद|पर्ची/g, " bill "],
+  [/रेती|रेत|सैंड/g, " reti "], [/सीमेंट|सिमेंट|सीमेन्ट/g, " cement "],
+  [/ब्रास|ब्रेस|बरस|वर्ष/g, " brass "], [/बैग|बोरी|कट्टा/g, " bag "],
+  [/ट्रिप|फेरा|फेरे/g, " trip "], [/घंटा|घंटे/g, " hour "], [/किलो/g, " kg "],
+  [/डीजल/g, " diesel "], [/पेट्रोल/g, " petrol "], [/खर्चा|खर्च|खरचा|खरच/g, " kharcha "],
+  [/चाय/g, " chai "], [/नाश्ता/g, " nashta "], [/मजदूरी|लेबर/g, " labour "], [/किराया/g, " rent "], [/बिजली/g, " bijli "],
+  [/भेजी|भेजा|भेजे|भेजो|दिया|दीया|दिये|दिए|दी/g, " diya "],
+  [/मिला|मिले|मिली|प्राप्त/g, " mila "], [/चुकाया|चुकता/g, " chukaya "],
+  [/पेमेंट|भुगतान/g, " payment "], [/कैश|नकद/g, " cash "], [/जमा/g, " jama "], [/एडवांस|अग्रिम/g, " advance "],
+  [/ को /g, " ko "], [/ ने /g, " ne "], [/ से /g, " se "], [/ का | की | के /g, " ka "],
+];
+
+function normalizeBusinessTerms(s: string): string {
+  let out = normalizeDigits(s);
+  for (const [match, replacement] of HINDI_BUSINESS_WORDS) out = out.replace(match, replacement);
+  return out.replace(/\s+/g, " ").trim();
+}
+
+function sameLooseWord(a: string, b: string): boolean {
+  return a.localeCompare(b, undefined, { sensitivity: "base" }) === 0;
+}
+
+/** Remove Web Speech cumulative/interim repetition such as "hello hello aaj hello aaj...". */
+export function cleanDictationText(input: string): string {
+  const normalized = normalizeBusinessTerms(input)
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return "";
+
+  const rawWords = normalized.split(/\s+/).filter(Boolean);
+  const words: string[] = [];
+  for (const word of rawWords) {
+    const prev = words[words.length - 1];
+    const prev2 = words[words.length - 2];
+    if (prev && prev2 && sameLooseWord(prev, word) && sameLooseWord(prev2, word)) continue;
+    words.push(word);
+    for (let size = Math.min(8, Math.floor(words.length / 2)); size >= 1; size--) {
+      const a = words.slice(words.length - size * 2, words.length - size);
+      const b = words.slice(words.length - size);
+      if (a.length === size && b.length === size && a.every((w, i) => sameLooseWord(w, b[i]))) {
+        words.splice(words.length - size, size);
+        break;
+      }
+    }
+  }
+
+  let out = words.join(" ");
+  out = out.replace(/^(?:(?:hello|helo|हेलो|हलो|halo)\s+){1,}/i, "").trim();
+  return out;
+}
+
 // Common Hinglish spelling variants → canonical forms (only for parsing, not display)
 function normalizeSpelling(s: string): string {
-  return s
+  return normalizeBusinessTerms(s)
     .replace(/\bbrs\b/gi, "brass")
     .replace(/\bbori\b/gi, "bag")
     .replace(/\bborie?s\b/gi, "bag")
@@ -130,6 +185,12 @@ function extractAllNumbers(s: string): number[] {
     if (m[1]) out.push(parseFloat(m[1]) * 1000);
     else if (m[2]) out.push(parseFloat(m[2]) * (NUM_WORDS[m[3].toLowerCase()] ?? 1));
     else if (m[4]) out.push(parseFloat(m[4].replace(/,/g, "")));
+  }
+  if (out.length === 0) {
+    for (const token of t.toLowerCase().split(/\s+/)) {
+      const n = NUM_WORDS[token];
+      if (n != null && n > 0 && n < 1000) out.push(n);
+    }
   }
   return out;
 }
@@ -250,11 +311,44 @@ function splitLines(sentence: string): string[] {
 
 // Split full message into sentences / commands
 function splitSentences(text: string): string[] {
-  return normalizeDigits(text)
+  return cleanDictationText(text)
     .replace(/\r/g, "")
     .split(/\n+|[.;।]|(?:^|\s)[-*•]\s+|(?:^|\s)\d+[.)]\s+| phir | then | uske baad | fir | baad me /gi)
+    .flatMap(splitCompoundClauses)
     .map((s) => s.trim())
     .filter((s) => s.length > 1);
+}
+
+const NON_NAME_TOKENS = new Set([
+  "aaj", "kal", "parso", "ka", "ki", "ke", "ko", "ne", "se", "aur", "and", "or", "plus",
+  "bill", "invoice", "payment", "cash", "paid", "advance", "kharcha", "hisab", "hisaab", "stock", "udhaar",
+  "brass", "bag", "trip", "hour", "kg", "ton", "piece", "pcs", "meter", "feet", "reti", "cement", "diesel", "petrol",
+  "diya", "bheji", "bheja", "mila", "chukaya", "jama", "liya", "batao", "dikhao",
+]);
+
+function cleanToken(token: string): string {
+  return token.replace(/^[^\p{L}\d]+|[^\p{L}\d]+$/gu, "");
+}
+
+function isNameToken(token: string): boolean {
+  const t = cleanToken(token).toLowerCase();
+  return t.length >= 2 && !/^\d/.test(t) && !NON_NAME_TOKENS.has(t) && NUM_WORDS[t] == null;
+}
+
+function splitCompoundClauses(sentence: string): string[] {
+  const tokens = sentence.split(/\s+/).filter(Boolean);
+  const starts = [0];
+  for (let i = 1; i < tokens.length - 1; i++) {
+    const marker = cleanToken(tokens[i + 1]).toLowerCase();
+    if ((marker === "ko" || marker === "ne" || marker === "se") && isNameToken(tokens[i])) {
+      const prevChunk = tokens.slice(starts[starts.length - 1], i).join(" ");
+      if (prevChunk.length > 8 && /(diya|bhej|mila|payment|cash|kharcha|paid|chukaya|jama|bill)/i.test(prevChunk)) {
+        starts.push(i);
+      }
+    }
+  }
+  if (starts.length === 1) return [sentence];
+  return starts.map((start, idx) => tokens.slice(start, starts[idx + 1] ?? tokens.length).join(" "));
 }
 
 // ---------- intent keywords ----------
