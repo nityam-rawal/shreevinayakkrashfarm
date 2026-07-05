@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { db, nextInvoiceNumber, adjustStockForLines } from "@/lib/db";
-import { parseCommand, type ParsedAction } from "@/lib/nlp";
+import { cleanDictationText, parseCommand, type ParsedAction } from "@/lib/nlp";
 import { synthesizeDay, type SynthesisResult } from "@/lib/agent";
 import { AgentConfirmSheet } from "@/components/AgentConfirmSheet";
 import { AppShell } from "@/components/AppShell";
@@ -97,10 +97,12 @@ function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<unknown>(null);
+  const latestInputRef = useRef(input);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoFiredRef = useRef(false);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => { latestInputRef.current = input; }, [input]);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
@@ -170,10 +172,13 @@ function ChatPage() {
       const r = recRef.current as { _stop?: boolean; stop: () => void } | null;
       if (r) { r._stop = true; r.stop(); }
       setListening(false);
+      const cleaned = cleanDictationText(latestInputRef.current);
+      latestInputRef.current = cleaned;
+      setInput(cleaned);
       // Real-time synthesis: if user dictated a full-day hisab, auto-analyze
       setTimeout(() => {
-        const t = (inputRef.current?.value ?? "").trim();
-        if (t.length > 20) void runSynthesis();
+        const t = cleanDictationText(latestInputRef.current).trim();
+        if (t.length > 20) void runSynthesis(t);
       }, 300);
       return;
     }
@@ -181,14 +186,14 @@ function ChatPage() {
     // Try Hindi first; if browser errors "language-not-supported", fall back to en-IN.
     const langs = ["hi-IN", "en-IN", "en-US"];
     let langIdx = 0;
-    let finalText = "";
+    const finalSegments: string[] = [];
 
     const start = () => {
       const rec = new SR() as {
         lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
-        onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal?: boolean }> }) => void;
+        onresult: (e: { resultIndex?: number; results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal?: boolean }> }) => void;
         onend: () => void; onerror: (e: { error: string }) => void;
-        start: () => void; stop: () => void; _stop?: boolean;
+        start: () => void; stop: () => void; _stop?: boolean; _fallback?: boolean;
       };
       rec.lang = langs[langIdx];
       rec.continuous = true;
@@ -196,23 +201,31 @@ function ChatPage() {
       rec.maxAlternatives = 3;
       rec.onresult = (e) => {
         let interim = "";
-        for (let i = 0; i < e.results.length; i++) {
+        const startAt = Math.max(0, e.resultIndex ?? 0);
+        for (let i = startAt; i < e.results.length; i++) {
           const r = e.results[i];
-          const t = r[0].transcript;
-          if ((r as unknown as { isFinal: boolean }).isFinal) finalText += t + " ";
-          else interim += t;
+          const t = (r[0]?.transcript ?? "").trim();
+          if (!t) continue;
+          if ((r as unknown as { isFinal: boolean }).isFinal) finalSegments.push(t);
+          else interim += `${t} `;
         }
-        setInput((finalText + interim).trim());
+        const next = cleanDictationText(`${finalSegments.join(" ")} ${interim}`);
+        latestInputRef.current = next;
+        setInput(next);
       };
       rec.onerror = (e) => {
         if (e.error === "language-not-supported" && langIdx < langs.length - 1) {
-          langIdx++; return; // onend will restart with next lang
+          langIdx++;
+          rec._fallback = true;
+          try { rec.stop(); } catch { /* noop */ }
+          return;
         }
         if (e.error === "no-speech" || e.error === "aborted") return;
         toast.error("Voice: " + e.error);
       };
       rec.onend = () => {
         if (rec._stop) { setListening(false); return; }
+        if (rec._fallback) { start(); return; }
         // auto-restart to keep capturing long dictations / lang fallback
         try { rec.start(); } catch { setListening(false); }
       };
@@ -243,8 +256,8 @@ function ChatPage() {
     }
   }
 
-  async function runSynthesis() {
-    const text = input.trim();
+  async function runSynthesis(sourceText?: string) {
+    const text = cleanDictationText(sourceText ?? input).trim();
     if (!text || text.length < 8) { toast.error("Pehle poora din ka hisab likho ya bolo."); return; }
     setSynthBusy(true);
     const tid = toast.loading("Vinayak AI analyze kar raha hai...");
@@ -366,7 +379,7 @@ function ChatPage() {
           {input.trim().length > 20 && (
             <Button
               type="button"
-              onClick={runSynthesis}
+              onClick={() => void runSynthesis()}
               disabled={synthBusy}
               variant="secondary"
               className="w-full gap-1.5 border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"

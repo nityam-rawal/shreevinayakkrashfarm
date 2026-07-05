@@ -5,7 +5,7 @@ import { db, seedIfEmpty, cashOnHand, partyBalance } from "@/lib/db";
 import { fmtINR, todayISO } from "@/lib/format";
 import { AppShell } from "@/components/AppShell";
 import { Users, BookOpen, Boxes, FileText, ArrowUpRight, ArrowDownRight, AlertTriangle, PackageX, Sparkles, Mic, Search, Loader2, X } from "lucide-react";
-import { parseCommand } from "@/lib/nlp";
+import { cleanDictationText, parseCommand } from "@/lib/nlp";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -57,7 +57,7 @@ function Dashboard() {
     };
     rec.lang = "hi-IN"; rec.interimResults = false; rec.continuous = false;
     rec.onresult = (e) => {
-      const t = e.results[0][0].transcript;
+      const t = cleanDictationText(e.results[0][0].transcript);
       setAiQ(t);
       void askAI(t);
     };
