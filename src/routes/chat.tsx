@@ -11,7 +11,7 @@ import { Send, Sparkles, CheckCircle2, Loader2, Mic, MicOff, Camera, WifiOff, Ca
 import { toast } from "sonner";
 import { todayISO, fmtINR } from "@/lib/format";
 import { ocrImage } from "@/lib/ocr";
-import { VoiceDictation } from "@/components/VoiceDictation";
+
 
 export const Route = createFileRoute("/chat")({
   head: () => ({ meta: [{ title: "AI Assistant — Offline" }] }),
