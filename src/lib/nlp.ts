@@ -70,9 +70,11 @@ const HINDI_BUSINESS_WORDS: [RegExp, string][] = [
   [/डीजल/g, " diesel "], [/पेट्रोल/g, " petrol "], [/खर्चा|खर्च|खरचा|खरच/g, " kharcha "],
   [/चाय/g, " chai "], [/नाश्ता/g, " nashta "], [/मजदूरी|लेबर/g, " labour "], [/किराया/g, " rent "], [/बिजली/g, " bijli "],
   [/भेजी|भेजा|भेजे|भेजो|दिया|दीया|दिये|दिए|दी/g, " diya "],
+  [/लिया|लीया|लिये|लिए/g, " liya "],
   [/मिला|मिले|मिली|प्राप्त/g, " mila "], [/चुकाया|चुकता/g, " chukaya "],
   [/पेमेंट|भुगतान/g, " payment "], [/कैश|नकद/g, " cash "], [/जमा/g, " jama "], [/एडवांस|अग्रिम/g, " advance "],
-  [/ को /g, " ko "], [/ ने /g, " ne "], [/ से /g, " se "], [/ का | की | के /g, " ka "],
+  [/और/g, " aur "], [/राम/g, " Ram "], [/रमेश/g, " Ramesh "], [/सुरेश/g, " Suresh "], [/मोहन/g, " Mohan "], [/किशोर/g, " Kishor "],
+  [/\sको\s/g, " ko "], [/\sने\s/g, " ne "], [/\sसे\s/g, " se "], [/\sका\s|\sकी\s|\sके\s/g, " ka "],
 ];
 
 function normalizeBusinessTerms(s: string): string {
@@ -365,6 +367,10 @@ function isNameToken(token: string): boolean {
 }
 
 function splitCompoundClauses(sentence: string): string[] {
+  const expanded = sentence
+    .replace(/\b(\d[\d,]*(?:\.\d+)?)\s+(?=(?:ka\s+)?(?:diesel|petrol|fuel|chai|nashta|labour|rent|bijli)\b)/gi, ". $1 ")
+    .replace(/\b((?:[\p{L} .'-]+?)\s+(?:ko|ne|se)\s+\d[\d,]*(?:\.\d+)?\s+(?:cash\s+)?(?:diya|mila|liya|payment|advance|paid|chukaya))\s+(?=\d)/giu, "$1. ");
+  if (expanded !== sentence) return expanded.split(/[.;।]/).flatMap(splitCompoundClauses).map((s) => s.trim()).filter(Boolean);
   const tokens = sentence.split(/\s+/).filter(Boolean);
   const starts = [0];
   for (let i = 1; i < tokens.length - 1; i++) {
