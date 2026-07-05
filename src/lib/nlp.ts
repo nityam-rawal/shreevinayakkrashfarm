@@ -367,13 +367,18 @@ function isNameToken(token: string): boolean {
 }
 
 function splitCompoundClauses(sentence: string): string[] {
-  const expanded = sentence
-    .replace(/\b(\d[\d,]*(?:\.\d+)?)\s+(?=(?:ka\s+)?(?:diesel|petrol|fuel|chai|nashta|labour|rent|bijli)\b)/gi, ". $1 ");
-  if (expanded !== sentence) return expanded.split(/[.;।]/).map((s) => s.trim()).filter(Boolean);
   const tokens = sentence.split(/\s+/).filter(Boolean);
   const starts = [0];
   for (let i = 1; i < tokens.length - 1; i++) {
     const marker = cleanToken(tokens[i + 1]).toLowerCase();
+    const current = cleanToken(tokens[i]).toLowerCase();
+    const next = cleanToken(tokens[i + 1]).toLowerCase();
+    const next2 = cleanToken(tokens[i + 2] ?? "").toLowerCase();
+    if (/^\d/.test(current) && (EXPENSE_CATEGORY_MAP.some((m) => m.match.test(next)) || EXPENSE_CATEGORY_MAP.some((m) => m.match.test(next2)))) {
+      const prevChunk = tokens.slice(starts[starts.length - 1], i).join(" ");
+      if (prevChunk.length > 8) starts.push(i);
+      continue;
+    }
     if ((marker === "ko" || marker === "ne" || marker === "se") && isNameToken(tokens[i])) {
       const prevChunk = tokens.slice(starts[starts.length - 1], i).join(" ");
       if (prevChunk.length > 8 && /(diya|bhej|mila|payment|cash|kharcha|paid|chukaya|jama|bill)/i.test(prevChunk)) {
