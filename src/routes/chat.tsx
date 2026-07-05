@@ -173,11 +173,12 @@ function ChatPage() {
       if (r) { r._stop = true; r.stop(); }
       setListening(false);
       const cleaned = cleanDictationText(latestInputRef.current);
+      latestInputRef.current = cleaned;
       setInput(cleaned);
       // Real-time synthesis: if user dictated a full-day hisab, auto-analyze
       setTimeout(() => {
         const t = cleanDictationText(latestInputRef.current).trim();
-        if (t.length > 20) void runSynthesis();
+        if (t.length > 20) void runSynthesis(t);
       }, 300);
       return;
     }
@@ -255,8 +256,8 @@ function ChatPage() {
     }
   }
 
-  async function runSynthesis() {
-    const text = input.trim();
+  async function runSynthesis(sourceText?: string) {
+    const text = cleanDictationText(sourceText ?? input).trim();
     if (!text || text.length < 8) { toast.error("Pehle poora din ka hisab likho ya bolo."); return; }
     setSynthBusy(true);
     const tid = toast.loading("Vinayak AI analyze kar raha hai...");
