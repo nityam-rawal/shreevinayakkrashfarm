@@ -269,6 +269,31 @@ function findParty(text: string, parties: Party[]): Party | null {
   return bestScore >= 25 ? best : null;
 }
 
+function inferPartyName(text: string): string | null {
+  const normalized = normalizeSpelling(text);
+  const patterns = [
+    /^\s*([\p{L}][\p{L} .'-]{1,40}?)\s+(?:ko|ne|se)\b/iu,
+    /\b(?:from|to)\s+([\p{L}][\p{L} .'-]{1,40}?)(?:\s|$)/iu,
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const candidate = match?.[1]
+      ?.split(/\s+/)
+      .filter((word) => isNameToken(word))
+      .slice(0, 3)
+      .join(" ")
+      .trim();
+    if (candidate && candidate.length >= 2) {
+      return candidate.replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+  }
+  return null;
+}
+
+function partyNameFor(text: string, parties: Party[]): string | null {
+  return findParty(text, parties)?.name ?? inferPartyName(text);
+}
+
 function findItem(phrase: string, items: Item[]): Item | null {
   let best: Item | null = null;
   let bestScore = 0;
@@ -279,6 +304,10 @@ function findItem(phrase: string, items: Item[]): Item | null {
     if (sc > bestScore) { bestScore = sc; best = it; }
   }
   return bestScore >= 20 ? best : null;
+}
+
+function hasAnyItem(text: string, items: Item[]): boolean {
+  return splitLines(text).some((part) => !!findItem(part, items)) || !!findItem(text, items);
 }
 
 // ---------- date detection ----------
@@ -405,6 +434,30 @@ function extractInvoiceLines(
   return lines;
 }
 
+function extractPaidAmount(s: string, invoiceTotal: number): number {
+  const t = normalizeSpelling(s);
+  const candidates: number[] = [];
+  const patterns = [
+    /\b(?:paid|cash|advance|adv|jama|liya|mila)\b\D{0,12}(\d[\d,]*(?:\.\d+)?)/gi,
+    /(\d[\d,]*(?:\.\d+)?)\D{0,12}\b(?:paid|cash|advance|adv|jama|liya|mila)\b/gi,
+  ];
+  for (const re of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(t)) !== null) candidates.push(parseFloat(m[1].replace(/,/g, "")));
+  }
+  const sane = candidates.filter((n) => n > 0 && n <= Math.max(invoiceTotal * 1.2, 1000000));
+  return sane.at(-1) ?? 0;
+}
+
+function isPaymentOutText(s: string): boolean {
+  return /\b(?:ko|to)\b.*\b(?:advance|paid|pay|payment|cash|diya|chukaya)\b/i.test(s)
+    && !/\b(?:ne|se|from)\b/i.test(s);
+}
+
+function isPaymentInText(s: string): boolean {
+  return /\b(?:ne|se|from)\b/i.test(s) || /\b(?:mila|received|aaya|jama|deposit|recovery)\b/i.test(s);
+}
+
 function parseSentence(
   sentence: string,
   parties: Party[],
@@ -427,49 +480,47 @@ function parseSentence(
   }
 
   // ---------- party-related ----------
-  const party = findParty(s, parties);
+  const partyName = partyNameFor(s, parties);
 
-  // Payment OUT (we paid to a supplier/staff)
-  if (party && KW_PAYMENT_OUT.test(s) && !findItem(s, items) && !KW_UNIT.test(s)) {
+  // Payment OUT (we paid advance/cash to someone) — "Mohan ko 2000 advance diya".
+  if (partyName && KW_PAYMENT_OUT.test(s) && isPaymentOutText(s) && !hasAnyItem(s, items) && !KW_UNIT.test(s)) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
       return {
         action: "add_ledger",
         data: {
-          partyName: party.name, type: "payment", amount: -amt,
+          partyName, type: "payment", amount: -amt,
           note: raw, date, direction: "out",
         },
       };
     }
   }
 
-  // Payment IN (received from party) — no items, no unit words
+  // Payment IN (received from party) — "Suresh ne 5000 cash diya".
   const isPaymentLike =
-    KW_PAYMENT_IN.test(s) && !findItem(s, items) && !KW_UNIT.test(s);
-  if (party && isPaymentLike) {
+    (KW_PAYMENT_IN.test(s) || /\b(cash|paid|diya)\b/i.test(s)) && isPaymentInText(s) && !hasAnyItem(s, items) && !KW_UNIT.test(s);
+  if (partyName && isPaymentLike) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
       return {
         action: "add_ledger",
-        data: { partyName: party.name, type: "payment", amount: amt, note: raw, date, direction: "in" },
+        data: { partyName, type: "payment", amount: amt, note: raw, date, direction: "in" },
       };
     }
   }
 
   // ---------- invoice / bill ----------
-  if (party && (KW_INVOICE.test(s) || KW_UNIT.test(s))) {
+  if (partyName && (KW_INVOICE.test(s) || KW_UNIT.test(s) || hasAnyItem(s, items))) {
     const withoutParty = s
-      .replace(new RegExp(party.name.split(/\s+/)[0], "ig"), "")
+      .replace(new RegExp(partyName.split(/\s+/)[0], "ig"), "")
       .replace(/\b(ko|ne|se)\b/gi, ",");
     const lines = extractInvoiceLines(withoutParty, items);
-    // extract "paid X" / "cash X" / "advance X"
-    let paid = 0;
-    const pm = s.match(/\b(paid|cash|advance|adv|jama)\b[^\d]{0,10}(\d+)/i);
-    if (pm) paid = parseInt(pm[2], 10);
     if (lines.length > 0) {
+      const total = lines.reduce((sum, l) => sum + l.qty * l.rate, 0);
+      const paid = extractPaidAmount(s, total);
       return {
         action: "create_invoice",
-        data: { partyName: party.name, lines, paid: paid || undefined, date },
+        data: { partyName, lines, paid: paid || undefined, date },
       };
     }
   }
