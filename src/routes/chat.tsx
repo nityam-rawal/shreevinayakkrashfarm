@@ -170,8 +170,14 @@ function ChatPage() {
       const r = recRef.current as { _stop?: boolean; stop: () => void } | null;
       if (r) { r._stop = true; r.stop(); }
       setListening(false);
+      // Real-time synthesis: if user dictated a full-day hisab, auto-analyze
+      setTimeout(() => {
+        const t = (inputRef.current?.value ?? "").trim();
+        if (t.length > 20) void runSynthesis();
+      }, 300);
       return;
     }
+
     // Try Hindi first; if browser errors "language-not-supported", fall back to en-IN.
     const langs = ["hi-IN", "en-IN", "en-US"];
     let langIdx = 0;
