@@ -355,7 +355,7 @@ function ChatPage() {
         </div>
 
         <div className="sticky bottom-20 mt-2 space-y-2">
-          <VoiceDictation onResult={(t: string) => setInput(t)} />
+
 
           {input.trim().length > 20 && (
             <Button
