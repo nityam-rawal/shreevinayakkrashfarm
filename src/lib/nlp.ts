@@ -500,6 +500,43 @@ function parseSentence(
   // ---------- party-related ----------
   const partyName = partyNameFor(s, parties);
 
+  // v3 §4.5: purchase-payable — "50 bag cement kamu se udhar li" → supplier we owe.
+  if (partyName && KW_PURCHASE_PAYABLE.test(s)) {
+    const withoutParty = s
+      .replace(new RegExp(partyName.split(/\s+/)[0], "ig"), "")
+      .replace(/\b(ko|ne|se)\b/gi, ",");
+    const lines = extractInvoiceLines(withoutParty, items);
+    // We don't know supplier's purchase-rate; use catalog rate as placeholder for total.
+    const amt = lines.reduce((sum, l) => sum + l.qty * l.rate, 0) || extractNumber(s) || 0;
+    if (amt > 0) {
+      return {
+        action: "add_ledger",
+        data: {
+          partyName, type: "invoice", amount: amt,
+          note: `Purchase on credit: ${raw}`, date, direction: "out",
+        },
+      };
+    }
+  }
+
+  // v3 §4.7: return trigger — surface as a note-only entry until dedicated return flow ships.
+  if (partyName && KW_RETURN.test(s) && hasAnyItem(s, items)) {
+    const withoutParty = s
+      .replace(new RegExp(partyName.split(/\s+/)[0], "ig"), "")
+      .replace(/\b(ko|ne|se)\b/gi, ",");
+    const lines = extractInvoiceLines(withoutParty, items);
+    const refundAmt = lines.reduce((sum, l) => sum + l.qty * l.rate, 0);
+    if (refundAmt > 0) {
+      return {
+        action: "add_ledger",
+        data: {
+          partyName, type: "adjustment", amount: refundAmt,
+          note: `Return: ${raw}`, date, direction: "in",
+        },
+      };
+    }
+  }
+
   // Payment OUT (we paid advance/cash to someone) — "Mohan ko 2000 advance diya".
   if (partyName && KW_PAYMENT_OUT.test(s) && isPaymentOutText(s) && !hasAnyItem(s, items) && !KW_UNIT.test(s)) {
     const amt = extractNumber(s) ?? 0;
@@ -514,9 +551,9 @@ function parseSentence(
     }
   }
 
-  // Payment IN (received from party) — "Suresh ne 5000 cash diya".
+  // Payment IN (received from party) — "Suresh ne 5000 cash diya" / "Nityam ka 500 jama".
   const isPaymentLike =
-    (KW_PAYMENT_IN.test(s) || /\b(cash|paid|diya)\b/i.test(s)) && isPaymentInText(s) && !hasAnyItem(s, items) && !KW_UNIT.test(s);
+    (KW_PAYMENT_IN.test(s) || /\b(cash|paid|diya)\b/i.test(s)) && (isPaymentInText(s) || /\bjama\b/i.test(s)) && !hasAnyItem(s, items) && !KW_UNIT.test(s);
   if (partyName && isPaymentLike) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
@@ -527,13 +564,19 @@ function parseSentence(
     }
   }
 
-  // ---------- invoice / bill ----------
+  // ---------- invoice / bill (sale to customer) ----------
   if (partyName && (KW_INVOICE.test(s) || KW_UNIT.test(s) || hasAnyItem(s, items))) {
     const withoutParty = s
       .replace(new RegExp(partyName.split(/\s+/)[0], "ig"), "")
       .replace(/\b(ko|ne|se)\b/gi, ",");
     const lines = extractInvoiceLines(withoutParty, items);
     if (lines.length > 0) {
+      // v3 §10.4: honor explicit rate override at sentence level.
+      const rateOverride = s.match(/(\d+(?:\.\d+)?)\s*(?:rate|ke\s*rate|per)\s*(?:pe|par)\s*(?:di|diya|bheji)/i);
+      if (rateOverride) {
+        const overrideRate = parseFloat(rateOverride[1]);
+        if (overrideRate > 0) for (const l of lines) l.rate = overrideRate;
+      }
       const total = lines.reduce((sum, l) => sum + l.qty * l.rate, 0);
       const paid = extractPaidAmount(s, total);
       return {
@@ -556,6 +599,7 @@ function parseSentence(
 
   return null;
 }
+
 
 // ---------- query intent (read-only synthesis) ----------
 
