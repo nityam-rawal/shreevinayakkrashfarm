@@ -89,7 +89,25 @@ const CASES: Case[] = [
   { desc: "Explicit rate override",
     input: "Ram ko 3 brass reti @4800 bheji",
     expect: [{ kind: "create_invoice", party: "Ram Kumar", lineCount: 1 }] },
+
+  // v3 spec — any-business regression checklist
+  { desc: "v3 §7.1 — jama universal payment",
+    input: "Ram ka jama 500",
+    expect: [{ kind: "add_ledger", party: "Ram Kumar", amount: 500 }] },
+
+  { desc: "v3 §4.5 — purchase payable (se udhar li)",
+    input: "50 bag cement Mohan se udhar li",
+    expect: [{ kind: "add_ledger", party: "Mohan Traders" }] },
+
+  { desc: "v3 §4.7 — return (wapas kiya)",
+    input: "Ram ne 2 bag cement wapas kiya",
+    expect: [{ kind: "add_ledger", party: "Ram Kumar" }] },
+
+  { desc: "v3 §10.4 — rate override (X rate pe di)",
+    input: "Suresh ko 2 bag cement 350 rate pe di",
+    expect: [{ kind: "create_invoice", party: "Suresh Patel", lineCount: 1 }] },
 ];
+
 
 type Result = { case: Case; pass: boolean; actual: ParsedAction[]; reason?: string };
 
