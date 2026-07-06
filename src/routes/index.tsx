@@ -6,6 +6,7 @@ import { fmtINR, todayISO } from "@/lib/format";
 import { AppShell } from "@/components/AppShell";
 import { Users, BookOpen, Boxes, FileText, ArrowUpRight, ArrowDownRight, AlertTriangle, PackageX, Sparkles, Mic, Search, Loader2, X } from "lucide-react";
 import { cleanDictationText, parseCommand } from "@/lib/nlp";
+import { getProfile } from "@/lib/business-profile";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,7 +26,12 @@ function Dashboard() {
   const aiInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     seedIfEmpty();
-  }, []);
+    // First-run: send new users to the setup wizard.
+    if (typeof window !== "undefined" && !getProfile().configured) {
+      navigate({ to: "/onboarding" });
+    }
+  }, [navigate]);
+
 
   async function askAI(text?: string) {
     const q = (text ?? aiQ).trim();

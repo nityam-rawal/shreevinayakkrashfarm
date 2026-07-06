@@ -119,10 +119,27 @@ export async function synthesizeDay(text: string): Promise<SynthesisResult> {
 
 // ---------- Tool executors (atomic per action) ----------
 
-async function ensureParty(name: string): Promise<number> {
+async function ensureParty(name: string, role: "customer" | "supplier" | "staff" = "customer"): Promise<number> {
   const p = await db.parties.where("name").equalsIgnoreCase(name).first();
   if (p?.id) return p.id;
-  return await db.parties.add({ name, type: "customer", createdAt: Date.now() });
+  return await db.parties.add({ name, type: role, createdAt: Date.now() });
+}
+
+/** Auto-learn any item on an invoice that isn't in the catalog yet. */
+async function learnInvoiceItems(lines: { name: string; unit: string; rate: number }[]) {
+  for (const l of lines) {
+    if (!l.name) continue;
+    const existing = await db.items.where("name").equalsIgnoreCase(l.name).first();
+    if (existing) continue;
+    await db.items.add({
+      name: l.name,
+      kind: "stock",
+      unit: l.unit || "piece",
+      rate: l.rate || 0,
+      category: "Auto-learned",
+      createdAt: Date.now(),
+    });
+  }
 }
 
 export async function runAction(a: ParsedAction): Promise<string> {
@@ -130,6 +147,7 @@ export async function runAction(a: ParsedAction): Promise<string> {
     const d = a.data;
     const lines = d.lines.map((l) => ({ ...l, amount: l.qty * l.rate }));
     const subtotal = lines.reduce((s, l) => s + l.amount, 0);
+    await learnInvoiceItems(lines);
     return await db.transaction("rw", [db.parties, db.invoices, db.ledger, db.cash, db.items], async () => {
       const partyId = await ensureParty(d.partyName);
       const number = await nextInvoiceNumber();
@@ -157,11 +175,20 @@ export async function runAction(a: ParsedAction): Promise<string> {
     const d = a.data;
     const date = d.date ?? todayISO();
     return await db.transaction("rw", [db.parties, db.ledger, db.cash], async () => {
-      const partyId = await ensureParty(d.partyName);
       const isOut = d.direction === "out" || d.amount < 0;
+      // v3: purchase-payable = "type: invoice" + "direction: out" — supplier lent us goods.
+      const isPurchasePayable = d.type === "invoice" && isOut;
+      const role: "customer" | "supplier" | "staff" = isPurchasePayable ? "supplier" : "customer";
+      const partyId = await ensureParty(d.partyName, role);
       const abs = Math.abs(d.amount);
-      const debit = d.type === "invoice" ? abs : isOut ? abs : 0;
-      const credit = d.type === "payment" && !isOut ? abs : 0;
+      let debit = 0, credit = 0;
+      if (d.type === "invoice") {
+        if (isPurchasePayable) credit = abs; // we owe supplier → credit their ledger
+        else debit = abs;                    // customer owes us
+      } else if (d.type === "payment") {
+        if (isOut) debit = abs;              // we paid customer/staff → reduces balance owed (or advance)
+        else credit = abs;                   // we received from customer
+      }
       await db.ledger.add({ partyId, date, type: d.type, debit, credit, note: d.note, createdAt: Date.now() });
       if (d.type === "payment") {
         await db.cash.add({
@@ -170,11 +197,13 @@ export async function runAction(a: ParsedAction): Promise<string> {
           note: d.partyName, partyId, createdAt: Date.now(),
         });
       }
-      return `${d.partyName} ${isOut ? "paid out" : "received"} ₹${abs}`;
+      const verb = isPurchasePayable ? "purchase on credit from" : isOut ? "paid out" : "received";
+      return `${d.partyName} ${verb} ₹${abs}`;
     });
   }
   return "";
 }
+
 
 export async function runAll(planned: PlannedAction[]): Promise<{ ok: number; fail: number; msgs: string[] }> {
   let ok = 0, fail = 0;

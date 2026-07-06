@@ -10,7 +10,7 @@ import { getShop, saveShop, type ShopProfile } from "@/lib/shop";
 import { createWorkspace, deleteWorkspace, getActiveWorkspaceId, listWorkspaces, renameWorkspace, switchWorkspace } from "@/lib/workspace";
 import { preloadWhisper } from "@/lib/whisper";
 import { toast } from "sonner";
-import { Download, Upload, Trash2, ShieldCheck, KeyRound, WifiOff, Store, Mic, Plus, Check } from "lucide-react";
+import { Download, Upload, Trash2, ShieldCheck, KeyRound, WifiOff, Store, Mic, Plus, Check, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings & Backup" }] }),
@@ -222,17 +222,30 @@ function SettingsPage() {
           }}>Whisper Model Pre-download</Button>
         </section>
 
+        {/* Business Profile / Vertical */}
+        <section className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+          <h2 className="flex items-center gap-2 font-display font-bold text-primary">
+            <Sparkles className="h-4 w-4" /> Business Type / Vertical
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Wapas setup wizard chalao — apna business type (kirana / tailor / cement / mobile / medical…) chuno.
+            AI turant us type ke items ready kar dega.
+          </p>
+          <Link to="/onboarding"><Button variant="outline" className="mt-3 w-full">Open Business Wizard</Button></Link>
+        </section>
+
         {/* AI Test Lab */}
         <section className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
           <h2 className="flex items-center gap-2 font-display font-bold text-primary">
             🧪 AI Test Lab
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Vinayak AI ko dummy data pe test karo — 15 real-world cases: bill, payment, expense,
+            Vinayak AI ko dummy data pe test karo — real-world cases: bill, payment, expense,
             Devanagari digits, typos, batch entries, queries. Fail hone pe exact reason milega.
           </p>
           <Link to="/ai-test"><Button variant="outline" className="mt-3 w-full">Open AI Test Lab</Button></Link>
         </section>
+
 
         {/* Backup */}
         <section className="rounded-2xl border border-border bg-card p-4">

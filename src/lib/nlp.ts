@@ -393,11 +393,18 @@ function splitCompoundClauses(sentence: string): string[] {
 // ---------- intent keywords ----------
 
 const KW_INVOICE = /\b(bill|invoice|bhej|bheji|bheja|bhejo|supply|diya|diye|de\s*do|bana|banao|banai|parchi|kaat|kaato)\b/i;
-const KW_PAYMENT_IN = /\b(mila|mile|mili|payment|chukta|chuka|chukaya|received|aaya|recover|jama|deposit)\b/i;
+// v3: "jama" is a universal payment marker across every trade — always payment_in.
+const KW_PAYMENT_IN = /\b(mila|mile|mili|payment|chukta|chuka|chukaya|received|aaya|recover|jama|deposit|bhugtan)\b/i;
 const KW_PAYMENT_OUT = /\b(diya\s+cash|cash\s+diya|paid\s+to|pay\s+kiya|advance\s+diya|chukaya|bhej\s+diya\s+cash)\b/i;
 const KW_EXPENSE = /\b(kharcha|kharch|kharach|diesel|petrol|fuel|salary|tankhah|mazdoori|labour|labor|rent|kiraya|repair|maintenance|tea|chai|paani|nashta|electricity|bijli|expense|kharche|puncture|toll|parking|khana|food)\b/i;
 const KW_INCOME = /\b(sales|sale|income|bechi|beche|bech\s+diya|recovery)\b/i;
-const KW_UNIT = /\b(brass|bag|trip|hour|hr|day|kg|ton|piece|pcs|meter|feet|fera|ghanta)\b/i;
+const KW_UNIT = /\b(brass|bag|trip|hour|hr|day|kg|ton|piece|pcs|meter|feet|fera|ghanta|liter|litre|packet|bottle|strip|session|visit|job|sqft|dozen|pair|set|roll|bundle|box)\b/i;
+// v3 §4.5: "se ... udhar li/liya" → purchase on credit (payable to supplier).
+const KW_PURCHASE_PAYABLE = /\b(?:se|k(?:e|i)?\s*(?:vaha|yaha|paas)\s*se)\b.*\budh[aa]?r\b.*\b(?:li|liya|liye|khareeda|kharida|mangaya|mangwaya)\b/i;
+// v3 §4.7: return trigger — reduces original invoice, no cash movement.
+const KW_RETURN = /\b(?:wapas|return|vapis|vaapas)\s+(?:kiya|ki|liya|li|di|diya)\b/i;
+// v3 §10.4: explicit rate override phrases ("discount me", "X rate pe di"). Used inline in parseSentence.
+
 
 const EXPENSE_CATEGORY_MAP: { match: RegExp; cat: string }[] = [
   { match: /diesel|petrol|fuel/i, cat: "Diesel" },
@@ -414,6 +421,7 @@ function detectExpenseCategory(s: string): string {
   for (const m of EXPENSE_CATEGORY_MAP) if (m.match.test(s)) return m.cat;
   return "Other";
 }
+
 
 // Parse item phrases in a sentence — handles both "2 brass reti" and "reti 2 brass"
 function extractInvoiceLines(
@@ -492,6 +500,43 @@ function parseSentence(
   // ---------- party-related ----------
   const partyName = partyNameFor(s, parties);
 
+  // v3 §4.5: purchase-payable — "50 bag cement kamu se udhar li" → supplier we owe.
+  if (partyName && KW_PURCHASE_PAYABLE.test(s)) {
+    const withoutParty = s
+      .replace(new RegExp(partyName.split(/\s+/)[0], "ig"), "")
+      .replace(/\b(ko|ne|se)\b/gi, ",");
+    const lines = extractInvoiceLines(withoutParty, items);
+    // We don't know supplier's purchase-rate; use catalog rate as placeholder for total.
+    const amt = lines.reduce((sum, l) => sum + l.qty * l.rate, 0) || extractNumber(s) || 0;
+    if (amt > 0) {
+      return {
+        action: "add_ledger",
+        data: {
+          partyName, type: "invoice", amount: amt,
+          note: `Purchase on credit: ${raw}`, date, direction: "out",
+        },
+      };
+    }
+  }
+
+  // v3 §4.7: return trigger — surface as a note-only entry until dedicated return flow ships.
+  if (partyName && KW_RETURN.test(s) && hasAnyItem(s, items)) {
+    const withoutParty = s
+      .replace(new RegExp(partyName.split(/\s+/)[0], "ig"), "")
+      .replace(/\b(ko|ne|se)\b/gi, ",");
+    const lines = extractInvoiceLines(withoutParty, items);
+    const refundAmt = lines.reduce((sum, l) => sum + l.qty * l.rate, 0);
+    if (refundAmt > 0) {
+      return {
+        action: "add_ledger",
+        data: {
+          partyName, type: "adjustment", amount: refundAmt,
+          note: `Return: ${raw}`, date, direction: "in",
+        },
+      };
+    }
+  }
+
   // Payment OUT (we paid advance/cash to someone) — "Mohan ko 2000 advance diya".
   if (partyName && KW_PAYMENT_OUT.test(s) && isPaymentOutText(s) && !hasAnyItem(s, items) && !KW_UNIT.test(s)) {
     const amt = extractNumber(s) ?? 0;
@@ -506,9 +551,9 @@ function parseSentence(
     }
   }
 
-  // Payment IN (received from party) — "Suresh ne 5000 cash diya".
+  // Payment IN (received from party) — "Suresh ne 5000 cash diya" / "Nityam ka 500 jama".
   const isPaymentLike =
-    (KW_PAYMENT_IN.test(s) || /\b(cash|paid|diya)\b/i.test(s)) && isPaymentInText(s) && !hasAnyItem(s, items) && !KW_UNIT.test(s);
+    (KW_PAYMENT_IN.test(s) || /\b(cash|paid|diya)\b/i.test(s)) && (isPaymentInText(s) || /\bjama\b/i.test(s)) && !hasAnyItem(s, items) && !KW_UNIT.test(s);
   if (partyName && isPaymentLike) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
@@ -519,13 +564,19 @@ function parseSentence(
     }
   }
 
-  // ---------- invoice / bill ----------
+  // ---------- invoice / bill (sale to customer) ----------
   if (partyName && (KW_INVOICE.test(s) || KW_UNIT.test(s) || hasAnyItem(s, items))) {
     const withoutParty = s
       .replace(new RegExp(partyName.split(/\s+/)[0], "ig"), "")
       .replace(/\b(ko|ne|se)\b/gi, ",");
     const lines = extractInvoiceLines(withoutParty, items);
     if (lines.length > 0) {
+      // v3 §10.4: honor explicit rate override at sentence level.
+      const rateOverride = s.match(/(\d+(?:\.\d+)?)\s*(?:rate|ke\s*rate|per)\s*(?:pe|par)\s*(?:di|diya|bheji)/i);
+      if (rateOverride) {
+        const overrideRate = parseFloat(rateOverride[1]);
+        if (overrideRate > 0) for (const l of lines) l.rate = overrideRate;
+      }
       const total = lines.reduce((sum, l) => sum + l.qty * l.rate, 0);
       const paid = extractPaidAmount(s, total);
       return {
@@ -548,6 +599,7 @@ function parseSentence(
 
   return null;
 }
+
 
 // ---------- query intent (read-only synthesis) ----------
 

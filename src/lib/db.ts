@@ -147,22 +147,12 @@ export async function adjustStockForLines(
   return out;
 }
 
-// Seed initial items so the app feels usable on first launch.
+// Legacy seed kept for backward compatibility. The onboarding wizard now
+// seeds a per-vertical catalog via seedVerticalCatalog(). Existing installs
+// that already had items retain them; new installs start empty until the
+// wizard runs.
 export async function seedIfEmpty() {
-  const count = await db.items.count();
-  if (count > 0) return;
-  const now = Date.now();
-  const seed: Item[] = [
-    { name: "Gujarat Reti (Badi)", kind: "stock", unit: "Brass", rate: 4500, category: "Reti", createdAt: now },
-    { name: "Gujarat Reti (Plaster)", kind: "stock", unit: "Brass", rate: 5200, category: "Reti", createdAt: now },
-    { name: "Pahadi Patthar", kind: "stock", unit: "Brass", rate: 3800, category: "Patthar", createdAt: now },
-    { name: "Kreshar (Crusher)", kind: "stock", unit: "Brass", rate: 4200, category: "Kreshar", createdAt: now },
-    { name: "Cement (OPC 53)", kind: "stock", unit: "Bag", rate: 380, category: "Cement", createdAt: now },
-    { name: "12 Chakka Dumper", kind: "service", unit: "Trip", rate: 6500, category: "Transport", createdAt: now },
-    { name: "6 Chakka Dumper", kind: "service", unit: "Trip", rate: 4200, category: "Transport", createdAt: now },
-    { name: "Tractor", kind: "service", unit: "Trip", rate: 1800, category: "Transport", createdAt: now },
-    { name: "JCB", kind: "service", unit: "Hour", rate: 950, category: "Machine", createdAt: now },
-    { name: "Water Tanker (Add-on)", kind: "service", unit: "Day", rate: 1500, category: "Add-on", createdAt: now },
-  ];
-  await db.items.bulkAdd(seed);
+  // no-op — kept as a safe call site for older code paths.
+  return;
 }
+
