@@ -3,6 +3,8 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { db, seedIfEmpty } from "@/lib/db";
+import { seedVerticalCatalog } from "@/lib/business-profile";
+
 import { parseCommand, type ParsedAction } from "@/lib/nlp";
 import { CheckCircle2, XCircle, Loader2, FlaskConical, Trash2 } from "lucide-react";
 import { toast } from "sonner";
