@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StockRouteImport } from './routes/stock'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CashbookRouteImport } from './routes/cashbook'
 import { Route as AiTestRouteImport } from './routes/ai-test'
@@ -28,6 +29,11 @@ const StockRoute = StockRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatRoute = ChatRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/ai-test': typeof AiTestRoute
   '/cashbook': typeof CashbookRoute
   '/chat': typeof ChatRoute
+  '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
   '/invoice/$id': typeof InvoiceIdRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/ai-test': typeof AiTestRoute
   '/cashbook': typeof CashbookRoute
   '/chat': typeof ChatRoute
+  '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
   '/invoice/$id': typeof InvoiceIdRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/ai-test': typeof AiTestRoute
   '/cashbook': typeof CashbookRoute
   '/chat': typeof ChatRoute
+  '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
   '/invoice/$id': typeof InvoiceIdRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/ai-test'
     | '/cashbook'
     | '/chat'
+    | '/onboarding'
     | '/settings'
     | '/stock'
     | '/invoice/$id'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/ai-test'
     | '/cashbook'
     | '/chat'
+    | '/onboarding'
     | '/settings'
     | '/stock'
     | '/invoice/$id'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/ai-test'
     | '/cashbook'
     | '/chat'
+    | '/onboarding'
     | '/settings'
     | '/stock'
     | '/invoice/$id'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   AiTestRoute: typeof AiTestRoute
   CashbookRoute: typeof CashbookRoute
   ChatRoute: typeof ChatRoute
+  OnboardingRoute: typeof OnboardingRoute
   SettingsRoute: typeof SettingsRoute
   StockRoute: typeof StockRoute
   InvoiceIdRoute: typeof InvoiceIdRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/chat': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   AiTestRoute: AiTestRoute,
   CashbookRoute: CashbookRoute,
   ChatRoute: ChatRoute,
+  OnboardingRoute: OnboardingRoute,
   SettingsRoute: SettingsRoute,
   StockRoute: StockRoute,
   InvoiceIdRoute: InvoiceIdRoute,
