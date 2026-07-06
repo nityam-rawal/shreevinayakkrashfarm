@@ -115,6 +115,9 @@ type Result = { case: Case; pass: boolean; actual: ParsedAction[]; reason?: stri
 
 async function seedDummy() {
   await seedIfEmpty();
+  // Ensure cement-vertical catalog exists so item-based tests can resolve.
+  await seedVerticalCatalog("cement");
+
   const now = Date.now();
   const ensure = async (name: string, type: "customer" | "supplier" | "staff") => {
     const ex = await db.parties.where("name").equalsIgnoreCase(name).first();
