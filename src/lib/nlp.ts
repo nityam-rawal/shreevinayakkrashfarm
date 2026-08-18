@@ -158,6 +158,7 @@ const NUM_WORDS: Record<string, number> = {
   "एक": 1, "दो": 2, "तीन": 3, "चार": 4, "पांच": 5, "पाँच": 5,
   "छह": 6, "सात": 7, "आठ": 8, "नौ": 9, "दस": 10,
   "बीस": 20, "पचास": 50, "सौ": 100, "हजार": 1000, "हज़ार": 1000, "लाख": 100000,
+  ...EXTRA_NUM_WORDS,
 };
 
 function extractNumber(s: string): number | null {
