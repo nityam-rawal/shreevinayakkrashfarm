@@ -126,7 +126,9 @@ export function cleanDictationText(input: string): string {
 
 // Common Hinglish spelling variants → canonical forms (only for parsing, not display)
 function normalizeSpelling(s: string): string {
-  return normalizeBusinessTerms(s)
+  let base = normalizeBusinessTerms(s);
+  for (const [match, replacement] of ROMAN_SYNONYMS) base = base.replace(match, replacement);
+  return base
     .replace(/\bbrs\b/gi, "brass")
     .replace(/\bbori\b/gi, "bag")
     .replace(/\bborie?s\b/gi, "bag")
