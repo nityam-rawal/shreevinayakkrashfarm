@@ -129,3 +129,42 @@ export function classifyIntentRaw(normalizedText: string): string | null {
   for (const r of INTENT_RULES) if (r.test.test(normalizedText)) return r.intent;
   return null;
 }
+
+const DEV_DIGITS = "०१२३४५६७८९";
+const GU_DIGITS = "૦૧૨૩૪૫૬૭૮૯";
+
+/** Dexie-free normalizer so the lexicon can be benchmarked standalone. */
+export function normalizeIndic(s: string): string {
+  let out = s
+    .replace(/[०-९]/g, (d) => String(DEV_DIGITS.indexOf(d)))
+    .replace(/[૦-૯]/g, (d) => String(GU_DIGITS.indexOf(d)));
+  for (const [m, r] of INDIC_NORMALIZERS) out = out.replace(m, r);
+  for (const [m, r] of ROMAN_SYNONYMS) out = out.replace(m, r);
+  return out.replace(/\s+/g, " ").trim();
+}
+
+/** Intent guess directly from raw multilingual text (no DB needed). */
+export function classifyIntentOffline(text: string): string | null {
+  return classifyIntentRaw(normalizeIndic(text));
+}
+
+/** Dataset intents that our engine treats as the same capability. */
+export const INTENT_ALIASES: Record<string, string> = {
+  TOOL_QUERY_LEDGER: "GET_CUSTOMER_OUTSTANDING",
+  TOOL_QUERY_SALES: "GET_SALES_REPORT",
+  TOOL_UPDATE_INVENTORY: "TOOL_UPDATE_INVENTORY",
+  RECORD_PAYMENT: "RECORD_RECEIPT",
+  RECORD_RECEIPT: "RECORD_RECEIPT",
+  GET_RECEIVABLE_REPORT: "GET_CUSTOMER_OUTSTANDING",
+  RECORD_MATERIAL_ISSUE: "RECORD_SALE",
+  RECORD_RECEIPT_OF_GOODS: "RECORD_PURCHASE",
+  CREATE_PURCHASE_ORDER: "RECORD_PURCHASE",
+  NEGATE_TRANSACTION: "NEGATE_ACTION",
+  MANUAL_BALANCE_OVERRIDE: "CORRECT_TRANSACTION",
+  TOP_SELLING_ITEMS: "GET_SALES_REPORT",
+  EXPLAIN_PROFIT_CHANGE: "GET_PROFIT_REPORT",
+};
+
+export function canonicalIntent(intent: string): string {
+  return INTENT_ALIASES[intent] ?? intent;
+}
