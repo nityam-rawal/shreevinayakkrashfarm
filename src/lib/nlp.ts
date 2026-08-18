@@ -769,3 +769,26 @@ export async function parseCommand(text: string): Promise<ParseResult> {
 
 // ---------- exported helpers for the test lab ----------
 export const _internal = { extractNumber, extractAllNumbers, parseDateFromText, normalizeDigits, levenshtein };
+
+// ---------- intent classification (dataset-aligned) ----------
+
+/**
+ * Offline intent guess for a single utterance, aligned with the canonical
+ * intent inventory of the Indic business training dataset. Any language
+ * (Hindi / Gujarati / romanised / mixed) is normalised first.
+ */
+export function classifyIntent(text: string): string | null {
+  return classifyIntentRaw(normalizeSpelling(text));
+}
+
+/** Maps a parsed action back to a canonical dataset intent (best effort). */
+export function intentOfAction(a: ParsedAction): string {
+  if (a.action === "create_invoice") return "RECORD_SALE";
+  if (a.action === "add_cash") return a.data.type === "expense" ? "RECORD_EXPENSE" : "RECORD_SALE";
+  if (a.action === "add_ledger") {
+    if (a.data.type === "invoice") return "RECORD_PURCHASE";
+    if (a.data.type === "adjustment") return "RECORD_SALES_RETURN";
+    return "RECORD_RECEIPT";
+  }
+  return "QUERY";
+}
