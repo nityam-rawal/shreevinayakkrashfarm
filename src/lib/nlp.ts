@@ -86,6 +86,7 @@ const HINDI_BUSINESS_WORDS: [RegExp, string][] = [
 function normalizeBusinessTerms(s: string): string {
   let out = normalizeDigits(s);
   for (const [match, replacement] of HINDI_BUSINESS_WORDS) out = out.replace(match, replacement);
+  for (const [match, replacement] of INDIC_NORMALIZERS) out = out.replace(match, replacement);
   return out.replace(/\s+/g, " ").trim();
 }
 
