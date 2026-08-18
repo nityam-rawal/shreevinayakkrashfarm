@@ -7,6 +7,12 @@
 
 import { db, partyBalance, cashOnHand, type Item, type Party } from "./db";
 import { fmtINR, todayISO } from "./format";
+import {
+  INDIC_NORMALIZERS,
+  ROMAN_SYNONYMS,
+  EXTRA_NUM_WORDS,
+  classifyIntentRaw,
+} from "./indic-lexicon";
 
 export type ParsedAction =
   | {
