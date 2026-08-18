@@ -410,7 +410,7 @@ const KW_EXPENSE = /\b(kharcha|kharch|kharach|diesel|petrol|fuel|salary|tankhah|
 const KW_INCOME = /\b(sales|sale|income|bechi|beche|bech\s+diya|recovery)\b/i;
 const KW_UNIT = /\b(brass|bag|trip|hour|hr|day|kg|ton|piece|pcs|meter|feet|fera|ghanta|liter|litre|packet|bottle|strip|session|visit|job|sqft|dozen|pair|set|roll|bundle|box)\b/i;
 // v3 §4.5: "se ... udhar li/liya" → purchase on credit (payable to supplier).
-const KW_PURCHASE_PAYABLE = /\b(?:se|k(?:e|i)?\s*(?:vaha|yaha|paas)\s*se)\b.*\budh[aa]?r\b.*\b(?:li|liya|liye|khareeda|kharida|mangaya|mangwaya)\b/i;
+const KW_PURCHASE_PAYABLE = /\b(?:se|k(?:e|i)?\s*(?:vaha|yaha|paas)\s*se)\b.*(?:\budh[aa]?r\b.*)?\b(?:li|liya|liye|khareeda|kharida|mangaya|mangwaya)\b/i;
 // v3 §4.7: return trigger — reduces original invoice, no cash movement.
 const KW_RETURN = /\b(?:wapas|return|vapis|vaapas)\s+(?:kiya|ki|liya|li|di|diya)\b/i;
 // v3 §10.4: explicit rate override phrases ("discount me", "X rate pe di"). Used inline in parseSentence.
