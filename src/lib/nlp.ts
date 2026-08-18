@@ -7,6 +7,12 @@
 
 import { db, partyBalance, cashOnHand, type Item, type Party } from "./db";
 import { fmtINR, todayISO } from "./format";
+import {
+  INDIC_NORMALIZERS,
+  ROMAN_SYNONYMS,
+  EXTRA_NUM_WORDS,
+  classifyIntentRaw,
+} from "./indic-lexicon";
 
 export type ParsedAction =
   | {
@@ -80,6 +86,7 @@ const HINDI_BUSINESS_WORDS: [RegExp, string][] = [
 function normalizeBusinessTerms(s: string): string {
   let out = normalizeDigits(s);
   for (const [match, replacement] of HINDI_BUSINESS_WORDS) out = out.replace(match, replacement);
+  for (const [match, replacement] of INDIC_NORMALIZERS) out = out.replace(match, replacement);
   return out.replace(/\s+/g, " ").trim();
 }
 
@@ -119,7 +126,9 @@ export function cleanDictationText(input: string): string {
 
 // Common Hinglish spelling variants → canonical forms (only for parsing, not display)
 function normalizeSpelling(s: string): string {
-  return normalizeBusinessTerms(s)
+  let base = normalizeBusinessTerms(s);
+  for (const [match, replacement] of ROMAN_SYNONYMS) base = base.replace(match, replacement);
+  return base
     .replace(/\bbrs\b/gi, "brass")
     .replace(/\bbori\b/gi, "bag")
     .replace(/\bborie?s\b/gi, "bag")
@@ -149,6 +158,7 @@ const NUM_WORDS: Record<string, number> = {
   "एक": 1, "दो": 2, "तीन": 3, "चार": 4, "पांच": 5, "पाँच": 5,
   "छह": 6, "सात": 7, "आठ": 8, "नौ": 9, "दस": 10,
   "बीस": 20, "पचास": 50, "सौ": 100, "हजार": 1000, "हज़ार": 1000, "लाख": 100000,
+  ...EXTRA_NUM_WORDS,
 };
 
 function extractNumber(s: string): number | null {
@@ -400,7 +410,7 @@ const KW_EXPENSE = /\b(kharcha|kharch|kharach|diesel|petrol|fuel|salary|tankhah|
 const KW_INCOME = /\b(sales|sale|income|bechi|beche|bech\s+diya|recovery)\b/i;
 const KW_UNIT = /\b(brass|bag|trip|hour|hr|day|kg|ton|piece|pcs|meter|feet|fera|ghanta|liter|litre|packet|bottle|strip|session|visit|job|sqft|dozen|pair|set|roll|bundle|box)\b/i;
 // v3 §4.5: "se ... udhar li/liya" → purchase on credit (payable to supplier).
-const KW_PURCHASE_PAYABLE = /\b(?:se|k(?:e|i)?\s*(?:vaha|yaha|paas)\s*se)\b.*\budh[aa]?r\b.*\b(?:li|liya|liye|khareeda|kharida|mangaya|mangwaya)\b/i;
+const KW_PURCHASE_PAYABLE = /\b(?:se|k(?:e|i)?\s*(?:vaha|yaha|paas)\s*se)\b.*(?:\budh[aa]?r\b.*)?\b(?:li|liya|liye|khareeda|kharida|mangaya|mangwaya)\b/i;
 // v3 §4.7: return trigger — reduces original invoice, no cash movement.
 const KW_RETURN = /\b(?:wapas|return|vapis|vaapas)\s+(?:kiya|ki|liya|li|di|diya)\b/i;
 // v3 §10.4: explicit rate override phrases ("discount me", "X rate pe di"). Used inline in parseSentence.
@@ -759,3 +769,26 @@ export async function parseCommand(text: string): Promise<ParseResult> {
 
 // ---------- exported helpers for the test lab ----------
 export const _internal = { extractNumber, extractAllNumbers, parseDateFromText, normalizeDigits, levenshtein };
+
+// ---------- intent classification (dataset-aligned) ----------
+
+/**
+ * Offline intent guess for a single utterance, aligned with the canonical
+ * intent inventory of the Indic business training dataset. Any language
+ * (Hindi / Gujarati / romanised / mixed) is normalised first.
+ */
+export function classifyIntent(text: string): string | null {
+  return classifyIntentRaw(normalizeSpelling(text));
+}
+
+/** Maps a parsed action back to a canonical dataset intent (best effort). */
+export function intentOfAction(a: ParsedAction): string {
+  if (a.action === "create_invoice") return "RECORD_SALE";
+  if (a.action === "add_cash") return a.data.type === "expense" ? "RECORD_EXPENSE" : "RECORD_SALE";
+  if (a.action === "add_ledger") {
+    if (a.data.type === "invoice") return "RECORD_PURCHASE";
+    if (a.data.type === "adjustment") return "RECORD_SALES_RETURN";
+    return "RECORD_RECEIPT";
+  }
+  return "QUERY";
+}
