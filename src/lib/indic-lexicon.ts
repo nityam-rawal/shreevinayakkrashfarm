@@ -101,27 +101,38 @@ interface IntentRule { intent: string; test: RegExp }
  * canonical Hinglish tokens.
  */
 export const INTENT_RULES: IntentRule[] = [
-  { intent: "DANGEROUS_BULK_DELETE", test: /\b(delete|remove|mita|hata)\b.*\b(all|sab|sabhi|everything|entire)\b|\b(all|sab)\b.*\b(delete|mita)\b/i },
-  { intent: "NEGATE_ACTION", test: /\b(nahi|not|cancel|mat|don'?t|do\s*not)\b.*\b(likho|save|record|banao|add)\b|\b(cancel|undo)\b/i },
-  { intent: "CORRECT_TRANSACTION", test: /\b(galat|wrong|correction|correct|sudhar|change|badal|instead)\b/i },
-  { intent: "GET_LOW_STOCK", test: /\b(low\s*stock|khatam|reorder\s*(?:level|point)?\s*(?:se\s*)?(?:kam|niche|below))\b/i },
-  { intent: "UPDATE_REORDER_LEVEL", test: /\breorder\s*(?:level|point)\b.*\b(\d+|set|karo|rakho)\b/i },
-  { intent: "GET_PROFIT_REPORT", test: /\bprofit\b.*\b(kitna|report|batao|show|kya)\b|\b(kitna|show|batao)\b.*\bprofit\b/i },
-  { intent: "GET_EXPENSE_REPORT", test: /\b(kharcha|expense)s?\b.*\b(kitna|report|total|batao|show)\b|\b(total|show|batao)\b.*\b(kharcha|expense)/i },
-  { intent: "GET_SALES_REPORT", test: /\b(sale|sales|bechi|vechan|revenue)\b.*\b(kitna|report|batao|show|total)\b|\b(show|batao|kitna|total)\b.*\b(sale|sales|bechi)\b/i },
-  { intent: "GET_STOCK", test: /\bstock\b.*\b(kitna|batao|show|hai|check)\b|\b(kitna|show|batao)\b.*\bstock\b/i },
-  { intent: "GET_SUPPLIER_PAYABLE", test: /\b(supplier|vendor)\b.*\b(dena|payable|owe|baki|udhaar)\b|\b(ko|owe)\b.*\b(dena|payable|apvanu|apvanun)\b/i },
-  { intent: "GET_CUSTOMER_OUTSTANDING", test: /\b(udhaar|outstanding|pending|owe|balance|khata)\b.*\b(kitna|batao|show|hai|kya)\b|\b(kitna)\b.*\b(lena|udhaar|outstanding|pending)\b/i },
-  { intent: "CREATE_INVOICE", test: /\b(bill|invoice|parchi)\b.*\b(banao|bana|create|make|kaato|generate)\b|\b(banao|create|make)\b.*\b(bill|invoice)\b/i },
-  { intent: "RECORD_SALES_RETURN", test: /\bwapas\b.*\b(customer|liya|diya|mila|kiya)?/i },
-  { intent: "RECORD_PURCHASE_RETURN", test: /\bwapas\b.*\b(supplier|bheja|damaged)\b/i },
+  // ---- safety / meta first ----
+  { intent: "DANGEROUS_BULK_DELETE", test: /\b(delete|remove|mita|hata)\b.*\b(all|sab|sabhi|sari|saari|badha|everything|entire)\b|\b(all|sab|sari|badha)\b.*\b(delete|mita|hata)\b/i },
+  { intent: "CORRECT_TRANSACTION", test: /\bbalance\b.*\b(zero|0)\b|\bchange\b.*\bfrom\b.*\bto\b|\b(galat|wrong|instead|actually|correction|sudhar|badal)\b|\b(no|na|nahi)\b\s*,?\s*(?:it\s*was|\d|kilo|kg)|\d+\s*(?:me\s*se|se)\s*\d+\s*karo/i },
+  { intent: "NEGATE_ACTION", test: /\b(nahi|not|didn'?t|did\s*not|do\s*not|don'?t|mat|cancel|undo)\b/i },
+  // ---- reports / queries before write-intents ----
+  { intent: "UPDATE_REORDER_LEVEL", test: /\b(reorder\s*(?:level|point)|minimum\s*stock|min\s*stock)\b/i },
+  { intent: "GET_LOW_STOCK", test: /\b(low[-\s]?stock|kam\s*stock|stock\s*kam|khatam|ochha|ocha)\b/i },
+  { intent: "GET_PROFIT_REPORT", test: /\bprofit\b/i },
+  { intent: "GET_SALES_REPORT", test: /\b(sabse\s*zyada|most|top|which\s*products?)\b.*\b(bik|bechi|sold|sell|vech)/i },
+  { intent: "GET_EXPENSE_REPORT", test: /\b(kharcha|expense)s?\b.*\b(kitna|kitne|total|report|batao|show|dikha)\b|\b(kitna|total|show|batao|dikha)\b.*\b(kharcha|expense)/i },
+  { intent: "GET_SALES_REPORT", test: /\b(sale|sales|bechi|vechan|revenue|turnover)\b.*\b(kitna|kitni|report|batao|show|total|dikha|between|from|kal|aaj|week|mahine)\b|\b(kitna|kitni|report|show|batao|dikha|total)\b.*\b(sale|sales|bechi|vechan|revenue)\b/i },
+  { intent: "GET_SUPPLIER_PAYABLE", test: /\b(?:we\s+)?owe\b(?!\s+us)|\b(payable|dena\s*hai|dene\s*hai|apvana|apva|dena)\b/i },
+  { intent: "GET_CUSTOMER_OUTSTANDING", test: /\b(udhaar|outstanding|pending|owes?|receivable|balance|khata|lena)\b/i },
+  { intent: "GET_STOCK", test: /\bstock\b|\binventory\b/i },
+  // ---- item / party creation ----
+  { intent: "CREATE_SUPPLIER", test: /\b(naya|new|add|jodo|umero)\b.*\b(supplier|vendor)\b|\b(supplier|vendor)\b.*\b(add|jodo|as|tarike)\b/i },
+  { intent: "CREATE_CUSTOMER", test: /\bcustomer\b.*\b(add|jodo|naya|new)\b|\b(add|naya|new|jodo)\b.*\bcustomer\b/i },
+  // ---- returns ----
+  { intent: "RECORD_PURCHASE_RETURN", test: /\bwapas\b.*\b(supplier|damaged)\b|\b(supplier|damaged)\b.*\bwapas\b/i },
+  { intent: "RECORD_SALES_RETURN", test: /\bwapas\b|\breturn(?:ed)?\b/i },
+  // ---- purchases ----
+  { intent: "RECORD_PURCHASE", test: /\b(batch|expiry)\b/i },
+  { intent: "RECORD_PURCHASE", test: /\b(order|mangwa|mangav|mangao)\b/i },
+  { intent: "RECORD_PURCHASE", test: /\b(kharida|purchase[ds]?|bought)\b|\bse\b[^.]*\b(liya|li|lidhi)\b/i },
+  // ---- money in / out ----
+  { intent: "RECORD_RECEIPT", test: /\b(payment|jama|deposit|chukaya|paid|received|mila)\b/i },
   { intent: "RECORD_EXPENSE", test: /\b(kharcha|expense|rent|gas|diesel|petrol|salary|bijli|electricity|chai|labour)\b/i },
-  { intent: "RECORD_RECEIPT", test: /\b(payment|cash|jama|mila|received|chukaya)\b.*\b(mila|jama|received|aaya|liya)\b|\b(ne|se)\b.*\b(payment|cash|jama)\b/i },
-  { intent: "RECORD_PURCHASE", test: /\b(kharida|purchase|khareeda|se\s+liya)\b/i },
-  { intent: "RECORD_SALE", test: /\b(bechi|bech|sold|sale|diya|bheja|supply)\b/i },
+  // ---- inventory tooling ----
   { intent: "TOOL_UPDATE_INVENTORY", test: /\badd\b.*\bstock\b|\bstock\b.*\badd\b/i },
-  { intent: "CREATE_CUSTOMER", test: /\b(naya|new|add)\b.*\bcustomer\b/i },
-  { intent: "CREATE_SUPPLIER", test: /\b(naya|new|add)\b.*\b(supplier|vendor)\b/i },
+  // ---- sales fallback ----
+  { intent: "RECORD_SALE", test: /\b(bechi|bech|sold|sell|sale|diya|diye|bheja|supply|use|vapar|likho)\b/i },
+  { intent: "GET_STOCK", test: /\bkitna\b[^.]*\bhai\b/i },
 ];
 
 /** Best-effort offline intent guess. Returns null when nothing matches. */
