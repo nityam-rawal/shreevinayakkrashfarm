@@ -768,7 +768,7 @@ export async function parseCommand(text: string): Promise<ParseResult> {
 }
 
 // ---------- exported helpers for the test lab ----------
-export const _internal = { extractNumber, extractAllNumbers, parseDateFromText, normalizeDigits, levenshtein };
+export const _internal = { extractNumber, extractAllNumbers, parseDateFromText, normalizeDigits, levenshtein, splitSentences, parseSentence, normalizeSpelling };
 
 // ---------- intent classification (dataset-aligned) ----------
 
