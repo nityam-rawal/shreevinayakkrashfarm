@@ -53,6 +53,19 @@ export const INDIC_NORMALIZERS: [RegExp, string][] = [
   [/इस\s*महीने|महीने|महीना/g, " mahine "], [/हफ्ते|सप्ताह/g, " week "],
   [/कितन(?:ा|े|ी)/g, " kitna "], [/क्या/g, " kya "], [/नहीं|मत\b/g, " nahi "],
   [/भाव|रेट/g, " rate "], [/रुपये|रूपये|रुपया/g, " "],
+  // ---- mined additions (benchmark-driven) ----
+  [/બધા|બધું/g, " sab "], [/વસ્તુ(?:ઓ)?/g, " item "], [/ઓછ(?:ા|ો|ુ|ું)/g, " kam "],
+  [/વાપર(?:્યું|યુ|ો)/g, " use "], [/મંગાવ(?:ી|ો|જો)?/g, " order "], [/રાખ(?:ો|જો)/g, " rakho "],
+  [/કેમ/g, " kyu "], [/સૌથી\s*વધારે/g, " sabse zyada "], [/તરીકે/g, " as "],
+  [/આપવા(?:ના|નું|નુ)?/g, " dena "], [/જોડો|ઉમેર/g, " add "], [/ન્યૂનતમ|લઘુત્તમ/g, " minimum "],
+  [/બાકી\s*છે/g, " udhaar hai "], [/હત(?:ુ|ું)/g, " tha "], [/ના,/g, " nahi, "],
+  [/વેચાણમાં/g, " sales "], [/નફો|નફા/g, " profit "],
+  [/बकाया/g, " udhaar "], [/देना|देने|देंगे/g, " dena "], [/लेना|लेने/g, " lena "],
+  [/मंगवा|मंगा/g, " order "], [/न्यूनतम|कम\s*से\s*कम/g, " minimum "], [/रखो|रखें/g, " rakho "],
+  [/सारी|सारे|सभी|सब\b/g, " sab "], [/डिलीट|मिटा/g, " delete "], [/जोड़/g, " add "],
+  [/प्लेट/g, " plate "], [/स्ट्रिप/g, " strip "], [/चीज(?:ें|े)?|वस्तु(?:एं)?/g, " item "],
+  [/कम\b/g, " kam "], [/क्यों/g, " kyu "], [/था|थी/g, " tha "], [/इस्तेमाल|इस्तमाल/g, " use "],
+  [/ग्राहक/g, " customer "], [/सप्लायर|विक्रेता/g, " supplier "], [/के\s*रूप\s*में/g, " as "],
 ];
 
 /** Romanised unit / item synonyms → canonical catalog wording. */
@@ -82,6 +95,16 @@ export const ROMAN_SYNONYMS: [RegExp, string][] = [
   [/\bbaki\b/gi, "udhaar"], [/\bnafo\b/gi, "profit"], [/\bbhave?\b/gi, "rate"],
   [/\bgaikale\b/gi, "kal"], [/\baa\s+mahine\b/gi, "mahine"],
   [/\bathvadiy(?:a|e|u)\b/gi, "week"],
+  // ---- mined additions ----
+  [/\bdikhao?\b/gi, "batao"], [/\bmoklya\b/gi, "bheja"], [/\bmoklav(?:a|ana|vana)\b/gi, "bheja"],
+  [/\baapvan(?:a|u|un)\b/gi, "dena"], [/\bapvan(?:a|u)\b/gi, "dena"],
+  [/\brupiya\b/gi, ""], [/\btarike\b/gi, "as"], [/\bvapary?u\b/gi, "use"],
+  [/\bmangav(?:i|o|jo)\b/gi, "order"], [/\bhatu\b/gi, "tha"], [/\bbadha\b/gi, "sab"],
+  [/\bochh?a\b/gi, "kam"], [/\bkem\b/gi, "kyu"], [/\bvastu(?:o)?\b/gi, "item"],
+  [/\bnafo\b/gi, "profit"], [/\bjodo\b/gi, "add"], [/\bumero\b/gi, "add"],
+  [/\bpurchased?\b/gi, "kharida"], [/\bbought\b/gi, "kharida"],
+  [/\bsold\b/gi, "bechi"], [/\bsells?\b/gi, "bechi"], [/\bsale\s*ki\b/gi, "bechi"],
+  [/\bpaid\b/gi, "payment"], [/\breceived\b/gi, "mila"], [/\bcheeni\b/gi, "sugar"],
 ];
 
 /** Gujarati/Hindi spoken numerals (romanised) not already in the parser map. */
