@@ -52,8 +52,12 @@ export const INDIC_NORMALIZERS: [RegExp, string][] = [
   [/वापस/g, " wapas "], [/ग्राहक/g, " customer "], [/मुनाफा|लाभ/g, " profit "],
   [/स्टॉक|इन्वेंटरी/g, " stock "], [/खराब/g, " damaged "],
   [/इस\s*महीने|महीने|महीना/g, " mahine "], [/हफ्ते|सप्ताह/g, " week "],
-  [/कितन(?:ा|े|ी)/g, " kitna "], [/क्या/g, " kya "], [/नहीं|मत\b/g, " nahi "],
+  [/कितन(?:ा|े|ी)/g, " kitna "], [/क्या/g, " kya "], [/नहीं|मत(?=\s|$)/g, " nahi "],
   [/भाव|रेट/g, " rate "], [/रुपये|रूपये|रुपया/g, " "],
+  [/\sसे\s/g, " se "], [/\sने\s/g, " ne "], [/\sको\s/g, " ko "], [/\sके\s*लिए\s/g, " ke liye "],
+  [/बिल|रसीद|पर्ची/g, " bill "], [/बनाओ|बना\s*दो|बनाना/g, " banao "], [/कर\s*दो|करो/g, " karo "],
+  [/कार्टन/g, " carton "], [/माल/g, " stock "], [/हिसाब/g, " hisab "],
+  [/કરો|કરી\s*નાખો/g, " karo "], [/કાર્ટન/g, " carton "],
   [/ખર્ચ/g, " kharcha "], [/આવી\s*ગય(?:ો|ું|ુ)/g, " aa gaya "],
   [/खर्च(?:ा|े)?/g, " kharcha "], [/किरा(?:या|ए|यl)?/g, " rent "],
   [/आ\s*गया|आ\s*गयी/g, " aa gaya "], [/बैलेंस/g, " balance "],
@@ -111,7 +115,7 @@ export const ROMAN_SYNONYMS: [RegExp, string][] = [
   [/\bnafo\b/gi, "profit"], [/\bjodo\b/gi, "add"], [/\bumero\b/gi, "add"],
   [/\bpurchased?\b/gi, "kharida"], [/\bbought\b/gi, "kharida"],
   [/\bsold\b/gi, "bechi"], [/\bsells?\b/gi, "bechi"], [/\bsale\s*ki\b/gi, "bechi"],
-  [/\bpaid\b/gi, "payment"], [/\breceived\b/gi, "mila"], [/\bcheeni\b/gi, "sugar"],
+  [/\bpaid\b/gi, "payment"], [/\breceived\b/gi, "mila"], [/\bcheeni\b/gi, "sugar"], [/\bhow\s+much\b/gi, "kitna"], [/\bcartons?\b/gi, "carton"],
 ];
 
 /** Gujarati/Hindi spoken numerals (romanised) not already in the parser map. */
@@ -153,7 +157,7 @@ export const INTENT_RULES: IntentRule[] = [
   { intent: "CREATE_CUSTOMER", test: /\bcustomer\b.*\b(add|jodo|naya|new)\b|\b(add|naya|new|jodo)\b.*\bcustomer\b/i },
   { intent: "CREATE_INVOICE", test: /\b(bill|invoice|parchi)\b/i },
   // ---- returns ----
-  { intent: "RECORD_PURCHASE_RETURN", test: /\bwapas\b.*\b(supplier|damaged)\b|\b(supplier|damaged)\b.*\bwapas\b/i },
+  { intent: "RECORD_PURCHASE_RETURN", test: /\b(wapas|return(?:ed)?)\b.*\b(supplier|damaged)\b|\b(supplier|damaged)\b.*\b(wapas|return(?:ed)?)\b/i },
   { intent: "RECORD_SALES_RETURN", test: /\bwapas\b|\breturn(?:ed)?\b/i },
   // ---- purchases ----
   { intent: "RECORD_PURCHASE", test: /\b(batch|expiry)\b/i },
@@ -166,7 +170,7 @@ export const INTENT_RULES: IntentRule[] = [
   // ---- inventory tooling ----
   { intent: "TOOL_UPDATE_INVENTORY", test: /\badd\b.*\bstock\b|\bstock\b.*\badd\b/i },
   // ---- sales fallback ----
-  { intent: "RECORD_SALE", test: /\b(bechi|bech|sold|sell|sale|diya|diye|bheja|supply|use|vapar|likho)\b/i },
+  { intent: "RECORD_SALE", test: /\b(bechi|bech|sold|sell|sale|diya|diye|bheja|supply|use|vapar|likho|kharida)\b/i },
   { intent: "GET_STOCK", test: /\bkitna\b[^.]*\bhai\b/i },
 ];
 
