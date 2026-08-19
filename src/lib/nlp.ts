@@ -229,7 +229,7 @@ function levenshtein(a: string, b: string): number {
   return dp[bl];
 }
 
-function scoreMatch(needle: string, hay: string): number {
+function scoreMatch(needle: string, hay: string, allowFuzzy = true): number {
   const n = needle.toLowerCase().trim();
   const h = hay.toLowerCase().trim();
   if (!n || !h) return 0;
@@ -243,7 +243,7 @@ function scoreMatch(needle: string, hay: string): number {
   for (const nt of ntok) {
     for (const ht of htok) {
       if (nt === ht) { overlap += 20; continue; }
-      if (nt.length >= 4 && ht.length >= 4) {
+      if (allowFuzzy && nt.length >= 4 && ht.length >= 4) {
         const d = levenshtein(nt, ht);
         if (d <= Math.max(1, Math.floor(Math.min(nt.length, ht.length) / 4))) {
           overlap += 15;
@@ -309,9 +309,12 @@ function partyNameFor(text: string, parties: Party[]): string | null {
 function findItem(phrase: string, items: Item[]): Item | null {
   let best: Item | null = null;
   let bestScore = 0;
+  // Typo-tolerant matching only when the phrase actually looks like a goods line
+  // (a unit word is present). Otherwise "salary 8k" fuzzily hits "Sariya" etc.
+  const allowFuzzy = KW_UNIT.test(phrase);
   for (const it of items) {
-    const s = scoreMatch(phrase, it.name);
-    const c = it.category ? scoreMatch(phrase, it.category) * 0.6 : 0;
+    const s = scoreMatch(phrase, it.name, allowFuzzy);
+    const c = it.category ? scoreMatch(phrase, it.category, allowFuzzy) * 0.6 : 0;
     const sc = Math.max(s, c);
     if (sc > bestScore) { bestScore = sc; best = it; }
   }
@@ -629,6 +632,12 @@ async function tryQuery(
   s: string, parties: Party[], items: Item[],
 ): Promise<ParsedAction | null> {
   if (!KW_QUERY.test(s) && !KW_UDHAAR.test(s) && !KW_STOCK.test(s)) return null;
+  // A sentence that carries goods + quantity + a transaction verb is a write,
+  // not a question — even if it mentions "udhaar".
+  const looksLikeWrite =
+    /\d/.test(s) && (KW_UNIT.test(s) || hasAnyItem(s, items)) &&
+    /\b(li|liya|liye|diya|diye|bheji|bheja|kharida|bechi|wapas|udhar)\b/i.test(s);
+  if (looksLikeWrite && !KW_QUERY.test(s)) return null;
 
   if (KW_STOCK.test(s)) {
     const stocks = items.filter((i) => i.kind === "stock");
