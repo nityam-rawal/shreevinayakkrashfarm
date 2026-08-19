@@ -330,7 +330,9 @@ function parseDateFromText(s: string): string | null {
   if (/\b(kal|yesterday)\b/i.test(t)) return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   if (/\b(parso|day before yesterday)\b/i.test(t)) return new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
   // DD/MM or DD-MM or DD/MM/YY(YY)
-  const m = t.match(/\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b/);
+  // Accept 12/05, 12-05-26, 12.05.2026 — but never a decimal like "2.5".
+  const m = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/)
+    ?? t.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{2,4})\b/);
   if (m) {
     const dd = parseInt(m[1], 10), mm = parseInt(m[2], 10);
     let yy = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
