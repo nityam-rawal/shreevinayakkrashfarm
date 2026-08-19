@@ -354,9 +354,11 @@ function splitLines(sentence: string): string[] {
 function splitSentences(text: string): string[] {
   return cleanDictationText(text)
     .replace(/\r/g, "")
+    // protect decimals ("2.5 hazaar") from the sentence splitter
+    .replace(/(\d)\.(\d)/g, "$1\u2024$2")
     .split(/\n+|[.;।]|(?:^|\s)[-*•]\s+|(?:^|\s)\d+[.)]\s+| phir | then | uske baad | fir | baad me /gi)
     .flatMap(splitCompoundClauses)
-    .map((s) => s.trim())
+    .map((s) => s.replace(/\u2024/g, ".").trim())
     .filter((s) => s.length > 1);
 }
 
@@ -497,7 +499,7 @@ function parseSentence(
   const date = parseDateFromText(s) ?? undefined;
 
   // ---------- expense (no party needed) ----------
-  if (KW_EXPENSE.test(s) && !KW_INVOICE.test(s) && !KW_UNIT.test(s)) {
+  if (KW_EXPENSE.test(s) && !KW_UNIT.test(s) && !hasAnyItem(s, items)) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
       return {
