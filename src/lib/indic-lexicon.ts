@@ -141,21 +141,26 @@ export const INTENT_RULES: IntentRule[] = [
   { intent: "GET_PROFIT_REPORT", test: /\bprofit\b/i },
   { intent: "GET_SALES_REPORT", test: /\b(sabse\s*zyada|most|top|which\s*products?)\b.*\b(bik|bechi|sold|sell|vech)/i },
   { intent: "GET_EXPENSE_REPORT", test: /\b(kharcha|expense)s?\b.*\b(kitna|kitne|total|report|batao|show|dikha)\b|\b(kitna|total|show|batao|dikha)\b.*\b(kharcha|expense)/i },
-  { intent: "GET_SALES_REPORT", test: /\b(sale|sales|bechi|vechan|revenue|turnover)\b.*\b(kitna|kitni|report|batao|show|total|dikha|between|from|kal|aaj|week|mahine)\b|\b(kitna|kitni|report|show|batao|dikha|total)\b.*\b(sale|sales|bechi|vechan|revenue)\b/i },
-  { intent: "GET_SUPPLIER_PAYABLE", test: /\b(?:we\s+)?owe\b(?!\s+us)|\b(payable|dena\s*hai|dene\s*hai|apvana|apva|dena)\b/i },
-  { intent: "GET_CUSTOMER_OUTSTANDING", test: /\b(udhaar|outstanding|pending|owes?|receivable|balance|khata|lena)\b/i },
+  { intent: "GET_SALES_REPORT", test: /\b(sale|sales|bechi|vechan|revenue|turnover)\b.*\b(kitna|kitni|report|batao|show|total|dikha|between|se|tak|kal|aaj|week|mahine|monday|friday)\b|\b(kitna|kitni|report|show|batao|dikha|total|tak)\b.*\b(sale|sales|bechi|vechan|revenue)\b/i },
+  { intent: "RECORD_PURCHASE", test: /\b(stock|maal)\b.*\baa\s*gaya\b|\baa\s*gaya\b.*\b(stock|maal)\b/i },
+  { intent: "TOOL_UPDATE_INVENTORY", test: /\badd\b.*\bstock\b|\bstock\b.*\badd\b/i },
   { intent: "GET_STOCK", test: /\bstock\b|\binventory\b/i },
+  { intent: "GET_CUSTOMER_OUTSTANDING", test: /\bkitna\b[^.]*\b(lena|liya)\b|\b(lena|liya)\b[^.]*\bkitna\b/i },
+  { intent: "GET_SUPPLIER_PAYABLE", test: /\b(?:we\s+)?owe\b(?!\s+us)|\b(payable|dena|dene|apvana|apva)\b/i },
+  { intent: "GET_CUSTOMER_OUTSTANDING", test: /\b(udhaar|outstanding|pending|owes?|receivable|balance|khata)\b/i },
   // ---- item / party creation ----
   { intent: "CREATE_SUPPLIER", test: /\b(naya|new|add|jodo|umero)\b.*\b(supplier|vendor)\b|\b(supplier|vendor)\b.*\b(add|jodo|as|tarike)\b/i },
   { intent: "CREATE_CUSTOMER", test: /\bcustomer\b.*\b(add|jodo|naya|new)\b|\b(add|naya|new|jodo)\b.*\bcustomer\b/i },
+  { intent: "CREATE_INVOICE", test: /\b(bill|invoice|parchi)\b/i },
   // ---- returns ----
   { intent: "RECORD_PURCHASE_RETURN", test: /\bwapas\b.*\b(supplier|damaged)\b|\b(supplier|damaged)\b.*\bwapas\b/i },
   { intent: "RECORD_SALES_RETURN", test: /\bwapas\b|\breturn(?:ed)?\b/i },
   // ---- purchases ----
   { intent: "RECORD_PURCHASE", test: /\b(batch|expiry)\b/i },
   { intent: "RECORD_PURCHASE", test: /\b(order|mangwa|mangav|mangao)\b/i },
-  { intent: "RECORD_PURCHASE", test: /\b(kharida|purchase[ds]?|bought)\b|\bse\b[^.]*\b(liya|li|lidhi)\b/i },
-  // ---- money in / out ----
+  { intent: "RECORD_PURCHASE", test: /\b(kharida|purchase[ds]?)\b[^.]*\bse\b|\bse\b[^.]*\b(kharida|purchase[ds]?|liya|li|lidhi)\b/i },
+  // ---- money in / out (amount only, no goods) ----
+  { intent: "RECORD_RECEIPT", test: /^(?!.*\b(kg|piece|box|packet|bag|liter|dozen|ton|plate|strip|brass|trip|hour|shirt|quintal)\b).*\b(?:ne|se|ko|e)\b.*\d.*\b(diya|diye|mila|payment|jama)\b/i },
   { intent: "RECORD_RECEIPT", test: /\b(payment|jama|deposit|chukaya|paid|received|mila)\b/i },
   { intent: "RECORD_EXPENSE", test: /\b(kharcha|expense|rent|gas|diesel|petrol|salary|bijli|electricity|chai|labour)\b/i },
   // ---- inventory tooling ----
