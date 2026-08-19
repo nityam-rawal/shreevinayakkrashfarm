@@ -6,6 +6,8 @@ import { db, seedIfEmpty } from "@/lib/db";
 import { seedVerticalCatalog } from "@/lib/business-profile";
 
 import { parseCommand, type ParsedAction } from "@/lib/nlp";
+import { TRAINING_CORPUS } from "@/lib/training-corpus";
+import { classifyIntentOffline, canonicalIntent } from "@/lib/indic-lexicon";
 import { CheckCircle2, XCircle, Loader2, FlaskConical, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -168,7 +170,40 @@ function checkOne(c: Case, actions: ParsedAction[]): { pass: boolean; reason?: s
   return { pass: true };
 }
 
+// Intents that need multi-turn state or dedicated screens — out of scope for
+// the single-utterance classifier, so they are reported separately.
+const OUT_OF_SCOPE = new Set([
+  "UNIT_NORMALIZATION", "INTENT", "MISSING_INFORMATION", "AMBIGUOUS_TRANSACTION",
+  "FILL_PENDING_PARTY", "FILL_PENDING_ITEM", "FILL_PENDING_SUPPLIER", "PENDING_ORDER",
+  "PRIVATE_DATA_REQUEST", "SEARCH_CUSTOMER", "CREATE_APPOINTMENT",
+  "CREATE_ITEM_VARIANT", "CREATE_ITEM", "RESERVE_ITEM", "CREATE_DELIVERY_ORDER",
+]);
+
+type Bench = {
+  total: number;
+  pass: number;
+  byLang: Record<string, { pass: number; total: number }>;
+  fails: { text: string; lang: string; expected: string; got: string }[];
+};
+
+function runBenchmark(): Bench {
+  const byLang: Bench["byLang"] = {};
+  const fails: Bench["fails"] = [];
+  let total = 0, pass = 0;
+  for (const r of TRAINING_CORPUS) {
+    if (OUT_OF_SCOPE.has(r.intent)) continue;
+    total++;
+    const lang = byLang[r.lang] ?? (byLang[r.lang] = { pass: 0, total: 0 });
+    lang.total++;
+    const got = classifyIntentOffline(r.text);
+    if (got && canonicalIntent(got) === canonicalIntent(r.intent)) { pass++; lang.pass++; }
+    else fails.push({ text: r.text, lang: r.lang, expected: r.intent, got: got ?? "—" });
+  }
+  return { total, pass, byLang, fails };
+}
+
 function AiTestPage() {
+  const [bench, setBench] = useState<Bench | null>(null);
   const [results, setResults] = useState<Result[]>([]);
   const [running, setRunning] = useState(false);
   const [seeded, setSeeded] = useState(false);
@@ -221,6 +256,46 @@ function AiTestPage() {
           </div>
           {seeded && (
             <p className="mt-2 text-[11px] text-success">✓ Dummy data ready. Ab /chat pe jaake "Ram ka udhaar batao" try karo.</p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h3 className="font-display font-bold">Indic dataset benchmark</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {TRAINING_CORPUS.length} real vendor utterances (Hindi, Gujarati, English, romanised
+            aur mixed) par intent understanding check karo — 100% offline.
+          </p>
+          <Button size="sm" className="mt-3" variant="outline" onClick={() => setBench(runBenchmark())}>
+            Run Language Benchmark
+          </Button>
+          {bench && (
+            <div className="mt-3 space-y-2 text-xs">
+              <div className="font-bold">
+                Intent accuracy:{" "}
+                <span className={bench.pass === bench.total ? "text-success" : "text-warning"}>
+                  {bench.pass}/{bench.total} ({Math.round((100 * bench.pass) / bench.total)}%)
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(bench.byLang).map(([lang, v]) => (
+                  <span key={lang} className="rounded-lg border border-border px-2 py-1">
+                    {lang}: {v.pass}/{v.total}
+                  </span>
+                ))}
+              </div>
+              {bench.fails.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer">{bench.fails.length} misses</summary>
+                  <ul className="mt-1 space-y-1">
+                    {bench.fails.map((f, i) => (
+                      <li key={i} className="text-destructive">
+                        [{f.lang}] "{f.text}" → {f.got} (expected {f.expected})
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
           )}
         </div>
 
