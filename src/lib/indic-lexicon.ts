@@ -57,7 +57,7 @@ export const INDIC_NORMALIZERS: [RegExp, string][] = [
   [/\sसे\s/g, " se "], [/\sने\s/g, " ne "], [/\sको\s/g, " ko "], [/\sके\s*लिए\s/g, " ke liye "],
   [/बिल|रसीद|पर्ची/g, " bill "], [/बनाओ|बना\s*दो|बनाना/g, " banao "], [/कर\s*दो|करो/g, " karo "],
   [/कार्टन/g, " carton "], [/शर्ट/g, " shirt "], [/बैच/g, " batch "], [/एक्सपायरी/g, " expiry "], [/माल/g, " stock "], [/हिसाब/g, " hisab "],
-  [/કરો|કરી\s*નાખો/g, " karo "], [/કાર્ટન/g, " carton "],
+  [/કરો|કરી\s*નાખો/g, " karo "], [/શર્ટ/g, " shirt "], [/બે(?=\s)/g, " 2 "], [/કાર્ટન/g, " carton "],
   [/ખર્ચ/g, " kharcha "], [/આવી\s*ગય(?:ો|ું|ુ)/g, " aa gaya "],
   [/खर्च(?:ा|े)?/g, " kharcha "], [/किरा(?:या|ए|यl)?/g, " rent "],
   [/आ\s*गया|आ\s*गयी/g, " aa gaya "], [/बैलेंस/g, " balance "],
@@ -137,7 +137,7 @@ interface IntentRule { intent: string; test: RegExp }
 export const INTENT_RULES: IntentRule[] = [
   // ---- safety / meta first ----
   { intent: "DANGEROUS_BULK_DELETE", test: /\b(delete|remove|mita|hata)\b.*\b(all|sab|sabhi|sari|saari|badha|everything|entire)\b|\b(all|sab|sari|badha)\b.*\b(delete|mita|hata)\b/i },
-  { intent: "CORRECT_TRANSACTION", test: /\bbalance\b.*\b(zero|0)\b|\bchange\b.*\bfrom\b.*\bto\b|\b(galat|wrong|instead|actually|correction|sudhar|badal)\b|\b(no|na|nahi)\b\s*,?\s*(?:it\s*was|\d|kilo|kg)|\d+\s*(?:me\s*se|se)\s*\d+\s*karo/i },
+  { intent: "CORRECT_TRANSACTION", test: /\bbalance\b.*\b(zero|0)\b|\bchange\b.*\b(?:from|se)\b.*\bto\b|\b(galat|wrong|instead|actually|correction|sudhar|badal)\b|\b(no|na|nahi)\b\s*,?\s*(?:it\s*was|\d|kilo|kg)|\d+\s*(?:me\s*se|se)\s*\d+\s*karo/i },
   { intent: "NEGATE_ACTION", test: /\b(nahi|not|didn'?t|did\s*not|do\s*not|don'?t|mat|cancel|undo)\b/i },
   // ---- reports / queries before write-intents ----
   { intent: "UPDATE_REORDER_LEVEL", test: /\b(reorder\s*(?:level|point)|minimum\s*stock|min\s*stock)\b/i },
