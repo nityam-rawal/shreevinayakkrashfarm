@@ -56,7 +56,7 @@ export const INDIC_NORMALIZERS: [RegExp, string][] = [
   [/भाव|रेट/g, " rate "], [/रुपये|रूपये|रुपया/g, " "],
   [/\sसे\s/g, " se "], [/\sने\s/g, " ne "], [/\sको\s/g, " ko "], [/\sके\s*लिए\s/g, " ke liye "],
   [/बिल|रसीद|पर्ची/g, " bill "], [/बनाओ|बना\s*दो|बनाना/g, " banao "], [/कर\s*दो|करो/g, " karo "],
-  [/कार्टन/g, " carton "], [/माल/g, " stock "], [/हिसाब/g, " hisab "],
+  [/कार्टन/g, " carton "], [/शर्ट/g, " shirt "], [/बैच/g, " batch "], [/एक्सपायरी/g, " expiry "], [/माल/g, " stock "], [/हिसाब/g, " hisab "],
   [/કરો|કરી\s*નાખો/g, " karo "], [/કાર્ટન/g, " carton "],
   [/ખર્ચ/g, " kharcha "], [/આવી\s*ગય(?:ો|ું|ુ)/g, " aa gaya "],
   [/खर्च(?:ा|े)?/g, " kharcha "], [/किरा(?:या|ए|यl)?/g, " rent "],
@@ -115,7 +115,7 @@ export const ROMAN_SYNONYMS: [RegExp, string][] = [
   [/\bnafo\b/gi, "profit"], [/\bjodo\b/gi, "add"], [/\bumero\b/gi, "add"],
   [/\bpurchased?\b/gi, "kharida"], [/\bbought\b/gi, "kharida"],
   [/\bsold\b/gi, "bechi"], [/\bsells?\b/gi, "bechi"], [/\bsale\s*ki\b/gi, "bechi"],
-  [/\bpaid\b/gi, "payment"], [/\breceived\b/gi, "mila"], [/\bcheeni\b/gi, "sugar"], [/\bhow\s+much\b/gi, "kitna"], [/\bcartons?\b/gi, "carton"],
+  [/\bpaid\b/gi, "payment"], [/\breceived\b/gi, "mila"], [/\bcheeni\b/gi, "sugar"], [/\bhow\s+much\b/gi, "kitna"], [/\bcartons?\b/gi, "carton"], [/\bfrom\b/gi, "se"], [/\bunits?\b/gi, "piece"],
 ];
 
 /** Gujarati/Hindi spoken numerals (romanised) not already in the parser map. */
@@ -164,7 +164,7 @@ export const INTENT_RULES: IntentRule[] = [
   { intent: "RECORD_PURCHASE", test: /\b(order|mangwa|mangav|mangao)\b/i },
   { intent: "RECORD_PURCHASE", test: /\b(kharida|purchase[ds]?)\b[^.]*\bse\b|\bse\b[^.]*\b(kharida|purchase[ds]?|liya|li|lidhi)\b/i },
   // ---- money in / out (amount only, no goods) ----
-  { intent: "RECORD_RECEIPT", test: /^(?!.*\b(kg|piece|box|packet|bag|liter|dozen|ton|plate|strip|brass|trip|hour|shirt|quintal)\b).*\b(?:ne|se|ko|e)\b.*\d.*\b(diya|diye|mila|payment|jama)\b/i },
+  { intent: "RECORD_RECEIPT", test: /^(?!.*\b(kg|piece|box|packet|bag|liter|dozen|ton|plate|strip|brass|trip|hour|shirt|carton|quintal)\b).*\d.*\b(diya|diye|mila|payment|jama)\b/i },
   { intent: "RECORD_RECEIPT", test: /\b(payment|jama|deposit|chukaya|paid|received|mila)\b/i },
   { intent: "RECORD_EXPENSE", test: /\b(kharcha|expense|rent|gas|diesel|petrol|salary|bijli|electricity|chai|labour)\b/i },
   // ---- inventory tooling ----
