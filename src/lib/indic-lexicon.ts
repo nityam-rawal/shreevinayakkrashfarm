@@ -9,7 +9,8 @@ export const INDIC_NORMALIZERS: [RegExp, string][] = [
   // ---- Gujarati script: verbs & business actions ----
   [/વેચ(?:ાણ|્યું|ી|યા|યુ)?/g, " bechi "],
   [/ખરીદ(?:્યું|ી|યા|યુ|ો)?/g, " kharida "],
-  [/આપ(?:્યા|્યું|ી|યુ|ો|વાનું|વાના)?/g, " diya "],
+  [/આપવા(?:ના|નું|નુ|નું)?|આપવાનું/g, " dena "],
+  [/આપ(?:્યા|્યું|ી|યુ|ો)?/g, " diya "],
   [/લિધ(?:ા|ી|ુ|ું)|લીધ(?:ા|ી|ુ|ું)|લેવ(?:ા|ાનું)/g, " liya "],
   [/મળ(?:્યા|્યું|ી|યુ)/g, " mila "],
   [/જમા/g, " jama "],
@@ -34,7 +35,7 @@ export const INDIC_NORMALIZERS: [RegExp, string][] = [
   [/આ\s*મહિને|મહિના/g, " mahine "], [/અઠવાડિય(?:ા|ે|ું)/g, " week "],
   [/કેટલ(?:ુ|ું|ા|ી|ો)/g, " kitna "], [/શું/g, " kya "],
   [/પાસેથી|માંથી/g, " se "], [/\sને\s/g, " ko "], [/\sમાટે\s/g, " ke liye "],
-  [/માં\b/g, " me "], [/છે\b/g, " hai "], [/નથી|નહીં|નહિ/g, " nahi "],
+  [/માં/g, " me "], [/છે(?=\s|$|\?)/g, " hai "], [/નથી|નહીં|નહિ/g, " nahi "],
   [/ભાવ(?:ે|થી)?/g, " rate "], [/હજાર/g, " hazaar "], [/રૂપિયા(?:નું|ના)?|રૂ\.?/g, " "],
   // ---- Gujarati units ----
   [/કિલો/g, " kg "], [/નંગ/g, " piece "], [/બોક્સ/g, " box "],
@@ -45,14 +46,37 @@ export const INDIC_NORMALIZERS: [RegExp, string][] = [
   [/खरीद(?:ा|े|ी|ो)?/g, " kharida "],
   [/चीनी|शक्कर/g, " sugar "], [/चावल/g, " rice "], [/गेहूं|गेहूँ/g, " wheat "],
   [/तेल/g, " oil "], [/दूध/g, " milk "], [/बिस्कुट|बिस्किट/g, " biscuit "],
-  [/गैस/g, " gas "], [/नग\b/g, " piece "], [/पैकेट/g, " packet "], [/डिब्बा|बॉक्स/g, " box "],
+  [/गैस/g, " gas "], [/नग(?=\s|$)/g, " piece "], [/पैकेट/g, " packet "], [/डिब्बा|बॉक्स/g, " box "],
   [/लीटर/g, " liter "], [/दर्जन/g, " dozen "], [/जोड़(?:ो|ें)/g, " add "],
   [/दिखा(?:ओ|ए|एं)?|बता(?:ओ|एं)?/g, " batao "], [/लिखो|दर्ज/g, " likho "],
   [/वापस/g, " wapas "], [/ग्राहक/g, " customer "], [/मुनाफा|लाभ/g, " profit "],
   [/स्टॉक|इन्वेंटरी/g, " stock "], [/खराब/g, " damaged "],
   [/इस\s*महीने|महीने|महीना/g, " mahine "], [/हफ्ते|सप्ताह/g, " week "],
-  [/कितन(?:ा|े|ी)/g, " kitna "], [/क्या/g, " kya "], [/नहीं|मत\b/g, " nahi "],
+  [/कितन(?:ा|े|ी)/g, " kitna "], [/क्या/g, " kya "], [/नहीं|मत(?=\s|$)/g, " nahi "],
   [/भाव|रेट/g, " rate "], [/रुपये|रूपये|रुपया/g, " "],
+  [/\sसे\s/g, " se "], [/\sने\s/g, " ne "], [/\sको\s/g, " ko "], [/\sके\s*लिए\s/g, " ke liye "],
+  [/बिल|रसीद|पर्ची/g, " bill "], [/बनाओ|बना\s*दो|बनाना/g, " banao "], [/कर\s*दो|करो/g, " karo "],
+  [/कार्टन/g, " carton "], [/शर्ट/g, " shirt "], [/बैच/g, " batch "], [/एक्सपायरी/g, " expiry "], [/माल/g, " stock "], [/हिसाब/g, " hisab "],
+  [/કરો|કરી\s*નાખો/g, " karo "], [/શર્ટ/g, " shirt "], [/બે(?=\s)/g, " 2 "], [/કાર્ટન/g, " carton "],
+  [/ખર્ચ/g, " kharcha "], [/આવી\s*ગય(?:ો|ું|ુ)/g, " aa gaya "],
+  [/खर्च(?:ा|े)?/g, " kharcha "], [/किरा(?:या|ए|यl)?/g, " rent "],
+  [/आ\s*गया|आ\s*गयी/g, " aa gaya "], [/बैलेंस/g, " balance "],
+  [/दिए|दिये|दिया|दी(?=\s|$)/g, " diya "], [/भेज/g, " bheja "],
+  [/सोमवार/g, " monday "], [/शुक्रवार/g, " friday "], [/तक/g, " tak "],
+  [/સોમવાર/g, " monday "], [/શુક્રવાર/g, " friday "], [/સુધી(?:નું|ના)?/g, " tak "],
+  // ---- mined additions (benchmark-driven) ----
+  [/બધા|બધું/g, " sab "], [/વસ્તુ(?:ઓ)?/g, " item "], [/ઓછ(?:ા|ો|ુ|ું)/g, " kam "],
+  [/વાપર(?:્યું|યુ|ો)/g, " use "], [/મંગાવ(?:ી|ો|જો)?/g, " order "], [/રાખ(?:ો|જો)/g, " rakho "],
+   [/કેમ/g, " kyu "], [/સૌથી\s*વધારે/g, " sabse zyada "], [/તરીકે/g, " as "],
+  [/આપવા(?:ના|નું|નુ)?/g, " dena "], [/જોડો|ઉમેર/g, " add "], [/ન્યૂનતમ|લઘુત્તમ/g, " minimum "],
+  [/બાકી\s*છે/g, " udhaar hai "], [/હત(?:ુ|ું)/g, " tha "], [/ના,/g, " nahi, "],
+  [/વેચાણમાં/g, " sales "], [/નફો|નફા/g, " profit "],
+  [/बकाया/g, " udhaar "], [/देना|देने|देंगे/g, " dena "], [/लेना|लेने/g, " lena "],
+  [/मंगवा|मंगा/g, " order "], [/न्यूनतम|कम\s*से\s*कम/g, " minimum "], [/रखो|रखें/g, " rakho "],
+  [/सारी|सारे|सभी|सब(?=\s|$)/g, " sab "], [/डिलीट|मिटा/g, " delete "], [/जोड़/g, " add "],
+  [/प्लेट/g, " plate "], [/स्ट्रिप/g, " strip "], [/चीज(?:ें|े)?|वस्तु(?:एं)?/g, " item "],
+  [/कम(?=\s|$)/g, " kam "], [/क्यों/g, " kyu "], [/था|थी/g, " tha "], [/इस्तेमाल|इस्तमाल/g, " use "],
+  [/ग्राहक/g, " customer "], [/सप्लायर|विक्रेता/g, " supplier "], [/के\s*रूप\s*में/g, " as "],
 ];
 
 /** Romanised unit / item synonyms → canonical catalog wording. */
@@ -82,6 +106,16 @@ export const ROMAN_SYNONYMS: [RegExp, string][] = [
   [/\bbaki\b/gi, "udhaar"], [/\bnafo\b/gi, "profit"], [/\bbhave?\b/gi, "rate"],
   [/\bgaikale\b/gi, "kal"], [/\baa\s+mahine\b/gi, "mahine"],
   [/\bathvadiy(?:a|e|u)\b/gi, "week"],
+  // ---- mined additions ----
+  [/\bdikhao?\b/gi, "batao"], [/\bmoklya\b/gi, "bheja"], [/\bmoklav(?:a|ana|vana)\b/gi, "bheja"],
+  [/\baapvan(?:a|u|un)\b/gi, "dena"], [/\bapvan(?:a|u)\b/gi, "dena"],
+  [/\brupiya\b/gi, ""], [/\btarike\b/gi, "as"], [/\bvapary?u\b/gi, "use"],
+  [/\bmangav(?:i|o|jo)\b/gi, "order"], [/\bhatu\b/gi, "tha"], [/\bbadha\b/gi, "sab"],
+  [/\bochh?a\b/gi, "kam"], [/\bkem\b/gi, "kyu"], [/\bvastu(?:o)?\b/gi, "item"],
+  [/\bnafo\b/gi, "profit"], [/\bjodo\b/gi, "add"], [/\bumero\b/gi, "add"],
+  [/\bpurchased?\b/gi, "kharida"], [/\bbought\b/gi, "kharida"],
+  [/\bsold\b/gi, "bechi"], [/\bsells?\b/gi, "bechi"], [/\bsale\s*ki\b/gi, "bechi"],
+  [/\bpaid\b/gi, "payment"], [/\breceived\b/gi, "mila"], [/\bcheeni\b/gi, "sugar"], [/\bhow\s+much\b/gi, "kitna"], [/\bcartons?\b/gi, "carton"], [/\bfrom\b/gi, "se"], [/\bunits?\b/gi, "piece"],
 ];
 
 /** Gujarati/Hindi spoken numerals (romanised) not already in the parser map. */
@@ -101,27 +135,43 @@ interface IntentRule { intent: string; test: RegExp }
  * canonical Hinglish tokens.
  */
 export const INTENT_RULES: IntentRule[] = [
-  { intent: "DANGEROUS_BULK_DELETE", test: /\b(delete|remove|mita|hata)\b.*\b(all|sab|sabhi|everything|entire)\b|\b(all|sab)\b.*\b(delete|mita)\b/i },
-  { intent: "NEGATE_ACTION", test: /\b(nahi|not|cancel|mat|don'?t|do\s*not)\b.*\b(likho|save|record|banao|add)\b|\b(cancel|undo)\b/i },
-  { intent: "CORRECT_TRANSACTION", test: /\b(galat|wrong|correction|correct|sudhar|change|badal|instead)\b/i },
-  { intent: "GET_LOW_STOCK", test: /\b(low\s*stock|khatam|reorder\s*(?:level|point)?\s*(?:se\s*)?(?:kam|niche|below))\b/i },
-  { intent: "UPDATE_REORDER_LEVEL", test: /\breorder\s*(?:level|point)\b.*\b(\d+|set|karo|rakho)\b/i },
-  { intent: "GET_PROFIT_REPORT", test: /\bprofit\b.*\b(kitna|report|batao|show|kya)\b|\b(kitna|show|batao)\b.*\bprofit\b/i },
-  { intent: "GET_EXPENSE_REPORT", test: /\b(kharcha|expense)s?\b.*\b(kitna|report|total|batao|show)\b|\b(total|show|batao)\b.*\b(kharcha|expense)/i },
-  { intent: "GET_SALES_REPORT", test: /\b(sale|sales|bechi|vechan|revenue)\b.*\b(kitna|report|batao|show|total)\b|\b(show|batao|kitna|total)\b.*\b(sale|sales|bechi)\b/i },
-  { intent: "GET_STOCK", test: /\bstock\b.*\b(kitna|batao|show|hai|check)\b|\b(kitna|show|batao)\b.*\bstock\b/i },
-  { intent: "GET_SUPPLIER_PAYABLE", test: /\b(supplier|vendor)\b.*\b(dena|payable|owe|baki|udhaar)\b|\b(ko|owe)\b.*\b(dena|payable|apvanu|apvanun)\b/i },
-  { intent: "GET_CUSTOMER_OUTSTANDING", test: /\b(udhaar|outstanding|pending|owe|balance|khata)\b.*\b(kitna|batao|show|hai|kya)\b|\b(kitna)\b.*\b(lena|udhaar|outstanding|pending)\b/i },
-  { intent: "CREATE_INVOICE", test: /\b(bill|invoice|parchi)\b.*\b(banao|bana|create|make|kaato|generate)\b|\b(banao|create|make)\b.*\b(bill|invoice)\b/i },
-  { intent: "RECORD_SALES_RETURN", test: /\bwapas\b.*\b(customer|liya|diya|mila|kiya)?/i },
-  { intent: "RECORD_PURCHASE_RETURN", test: /\bwapas\b.*\b(supplier|bheja|damaged)\b/i },
-  { intent: "RECORD_EXPENSE", test: /\b(kharcha|expense|rent|gas|diesel|petrol|salary|bijli|electricity|chai|labour)\b/i },
-  { intent: "RECORD_RECEIPT", test: /\b(payment|cash|jama|mila|received|chukaya)\b.*\b(mila|jama|received|aaya|liya)\b|\b(ne|se)\b.*\b(payment|cash|jama)\b/i },
-  { intent: "RECORD_PURCHASE", test: /\b(kharida|purchase|khareeda|se\s+liya)\b/i },
-  { intent: "RECORD_SALE", test: /\b(bechi|bech|sold|sale|diya|bheja|supply)\b/i },
+  // ---- safety / meta first ----
+  { intent: "DANGEROUS_BULK_DELETE", test: /\b(delete|remove|mita|hata)\b.*\b(all|sab|sabhi|sari|saari|badha|everything|entire)\b|\b(all|sab|sari|badha)\b.*\b(delete|mita|hata)\b/i },
+  { intent: "CORRECT_TRANSACTION", test: /\bbalance\b.*\b(zero|0)\b|\bchange\b.*\b(?:from|se)\b.*\bto\b|\b(galat|wrong|instead|actually|correction|sudhar|badal)\b|\b(no|na|nahi)\b\s*,?\s*(?:it\s*was|\d|kilo|kg)|\d+\s*(?:me\s*se|se)\s*\d+\s*karo/i },
+  { intent: "NEGATE_ACTION", test: /\b(nahi|not|didn'?t|did\s*not|do\s*not|don'?t|mat|cancel|undo)\b/i },
+  // ---- reports / queries before write-intents ----
+  { intent: "UPDATE_REORDER_LEVEL", test: /\b(reorder\s*(?:level|point)|minimum\s*stock|min\s*stock)\b/i },
+  { intent: "GET_LOW_STOCK", test: /\b(low[-\s]?stock|kam\s*stock|stock\s*kam|khatam|ochha|ocha)\b/i },
+  { intent: "GET_PROFIT_REPORT", test: /\bprofit\b/i },
+  { intent: "GET_SALES_REPORT", test: /\b(sabse\s*zyada|most|top|which\s*products?)\b.*\b(bik|bechi|sold|sell|vech)/i },
+  { intent: "GET_EXPENSE_REPORT", test: /\b(kharcha|expense)s?\b.*\b(kitna|kitne|total|report|batao|show|dikha)\b|\b(kitna|total|show|batao|dikha)\b.*\b(kharcha|expense)/i },
+  { intent: "GET_SALES_REPORT", test: /\b(sale|sales|bechi|vechan|revenue|turnover)\b.*\b(kitna|kitni|report|batao|show|total|dikha|between|se|tak|kal|aaj|week|mahine|monday|friday)\b|\b(kitna|kitni|report|show|batao|dikha|total|tak)\b.*\b(sale|sales|bechi|vechan|revenue)\b/i },
+  { intent: "RECORD_PURCHASE", test: /\b(stock|maal)\b.*\baa\s*gaya\b|\baa\s*gaya\b.*\b(stock|maal)\b/i },
   { intent: "TOOL_UPDATE_INVENTORY", test: /\badd\b.*\bstock\b|\bstock\b.*\badd\b/i },
-  { intent: "CREATE_CUSTOMER", test: /\b(naya|new|add)\b.*\bcustomer\b/i },
-  { intent: "CREATE_SUPPLIER", test: /\b(naya|new|add)\b.*\b(supplier|vendor)\b/i },
+  { intent: "GET_STOCK", test: /\bstock\b|\binventory\b/i },
+  { intent: "GET_CUSTOMER_OUTSTANDING", test: /\bkitna\b[^.]*\b(lena|liya)\b|\b(lena|liya)\b[^.]*\bkitna\b/i },
+  { intent: "GET_SUPPLIER_PAYABLE", test: /\b(?:we\s+)?owe\b(?!\s+us)|\b(payable|dena|dene|apvana|apva)\b/i },
+  { intent: "GET_CUSTOMER_OUTSTANDING", test: /\b(udhaar|outstanding|pending|owes?|receivable|balance|khata)\b/i },
+  // ---- item / party creation ----
+  { intent: "CREATE_SUPPLIER", test: /\b(naya|new|add|jodo|umero)\b.*\b(supplier|vendor)\b|\b(supplier|vendor)\b.*\b(add|jodo|as|tarike)\b/i },
+  { intent: "CREATE_CUSTOMER", test: /\bcustomer\b.*\b(add|jodo|naya|new)\b|\b(add|naya|new|jodo)\b.*\bcustomer\b/i },
+  { intent: "CREATE_INVOICE", test: /\b(bill|invoice|parchi)\b/i },
+  // ---- returns ----
+  { intent: "RECORD_PURCHASE_RETURN", test: /\b(wapas|return(?:ed)?)\b.*\b(supplier|damaged)\b|\b(supplier|damaged)\b.*\b(wapas|return(?:ed)?)\b/i },
+  { intent: "RECORD_SALES_RETURN", test: /\bwapas\b|\breturn(?:ed)?\b/i },
+  // ---- purchases ----
+  { intent: "RECORD_PURCHASE", test: /\b(batch|expiry)\b/i },
+  { intent: "RECORD_PURCHASE", test: /\b(order|mangwa|mangav|mangao)\b/i },
+  { intent: "RECORD_PURCHASE", test: /\b(kharida|purchase[ds]?)\b[^.]*\bse\b|\bse\b[^.]*\b(kharida|purchase[ds]?|liya|li|lidhi)\b/i },
+  // ---- money in / out (amount only, no goods) ----
+  { intent: "RECORD_RECEIPT", test: /^(?!.*\b(kg|piece|box|packet|bag|liter|dozen|ton|plate|strip|brass|trip|hour|shirt|carton|quintal)\b).*\d.*\b(diya|diye|mila|payment|jama)\b/i },
+  { intent: "RECORD_RECEIPT", test: /\b(payment|jama|deposit|chukaya|paid|received|mila)\b/i },
+  { intent: "RECORD_EXPENSE", test: /\b(kharcha|expense|rent|gas|diesel|petrol|salary|bijli|electricity|chai|labour)\b/i },
+  // ---- inventory tooling ----
+  { intent: "TOOL_UPDATE_INVENTORY", test: /\badd\b.*\bstock\b|\bstock\b.*\badd\b/i },
+  // ---- sales fallback ----
+  { intent: "RECORD_SALE", test: /\b(bechi|bech|sold|sell|sale|diya|diye|bheja|supply|use|vapar|likho|kharida)\b/i },
+  { intent: "GET_STOCK", test: /\bkitna\b[^.]*\bhai\b/i },
 ];
 
 /** Best-effort offline intent guess. Returns null when nothing matches. */

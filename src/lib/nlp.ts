@@ -229,7 +229,7 @@ function levenshtein(a: string, b: string): number {
   return dp[bl];
 }
 
-function scoreMatch(needle: string, hay: string): number {
+function scoreMatch(needle: string, hay: string, allowFuzzy = true): number {
   const n = needle.toLowerCase().trim();
   const h = hay.toLowerCase().trim();
   if (!n || !h) return 0;
@@ -243,7 +243,7 @@ function scoreMatch(needle: string, hay: string): number {
   for (const nt of ntok) {
     for (const ht of htok) {
       if (nt === ht) { overlap += 20; continue; }
-      if (nt.length >= 4 && ht.length >= 4) {
+      if (allowFuzzy && nt.length >= 4 && ht.length >= 4) {
         const d = levenshtein(nt, ht);
         if (d <= Math.max(1, Math.floor(Math.min(nt.length, ht.length) / 4))) {
           overlap += 15;
@@ -309,9 +309,12 @@ function partyNameFor(text: string, parties: Party[]): string | null {
 function findItem(phrase: string, items: Item[]): Item | null {
   let best: Item | null = null;
   let bestScore = 0;
+  // Typo-tolerant matching only when the phrase actually looks like a goods line
+  // (a unit word is present). Otherwise "salary 8k" fuzzily hits "Sariya" etc.
+  const allowFuzzy = KW_UNIT.test(phrase);
   for (const it of items) {
-    const s = scoreMatch(phrase, it.name);
-    const c = it.category ? scoreMatch(phrase, it.category) * 0.6 : 0;
+    const s = scoreMatch(phrase, it.name, allowFuzzy);
+    const c = it.category ? scoreMatch(phrase, it.category, allowFuzzy) * 0.6 : 0;
     const sc = Math.max(s, c);
     if (sc > bestScore) { bestScore = sc; best = it; }
   }
@@ -330,7 +333,9 @@ function parseDateFromText(s: string): string | null {
   if (/\b(kal|yesterday)\b/i.test(t)) return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   if (/\b(parso|day before yesterday)\b/i.test(t)) return new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
   // DD/MM or DD-MM or DD/MM/YY(YY)
-  const m = t.match(/\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b/);
+  // Accept 12/05, 12-05-26, 12.05.2026 — but never a decimal like "2.5".
+  const m = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/)
+    ?? t.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{2,4})\b/);
   if (m) {
     const dd = parseInt(m[1], 10), mm = parseInt(m[2], 10);
     let yy = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
@@ -354,9 +359,11 @@ function splitLines(sentence: string): string[] {
 function splitSentences(text: string): string[] {
   return cleanDictationText(text)
     .replace(/\r/g, "")
+    // protect decimals ("2.5 hazaar") from the sentence splitter
+    .replace(/(\d)\.(\d)/g, "$1\u2024$2")
     .split(/\n+|[.;।]|(?:^|\s)[-*•]\s+|(?:^|\s)\d+[.)]\s+| phir | then | uske baad | fir | baad me /gi)
     .flatMap(splitCompoundClauses)
-    .map((s) => s.trim())
+    .map((s) => s.replace(/\u2024/g, ".").trim())
     .filter((s) => s.length > 1);
 }
 
@@ -497,7 +504,7 @@ function parseSentence(
   const date = parseDateFromText(s) ?? undefined;
 
   // ---------- expense (no party needed) ----------
-  if (KW_EXPENSE.test(s) && !KW_INVOICE.test(s) && !KW_UNIT.test(s)) {
+  if (KW_EXPENSE.test(s) && !KW_UNIT.test(s) && !hasAnyItem(s, items)) {
     const amt = extractNumber(s) ?? 0;
     if (amt > 0) {
       return {
@@ -625,6 +632,12 @@ async function tryQuery(
   s: string, parties: Party[], items: Item[],
 ): Promise<ParsedAction | null> {
   if (!KW_QUERY.test(s) && !KW_UDHAAR.test(s) && !KW_STOCK.test(s)) return null;
+  // A sentence that carries goods + quantity + a transaction verb is a write,
+  // not a question — even if it mentions "udhaar".
+  const looksLikeWrite =
+    /\d/.test(s) && (KW_UNIT.test(s) || hasAnyItem(s, items)) &&
+    /\b(li|liya|liye|diya|diye|bheji|bheja|kharida|bechi|wapas|udhar)\b/i.test(s);
+  if (looksLikeWrite && !KW_QUERY.test(s)) return null;
 
   if (KW_STOCK.test(s)) {
     const stocks = items.filter((i) => i.kind === "stock");
@@ -768,7 +781,7 @@ export async function parseCommand(text: string): Promise<ParseResult> {
 }
 
 // ---------- exported helpers for the test lab ----------
-export const _internal = { extractNumber, extractAllNumbers, parseDateFromText, normalizeDigits, levenshtein };
+export const _internal = { extractNumber, extractAllNumbers, parseDateFromText, normalizeDigits, levenshtein, splitSentences, parseSentence, normalizeSpelling };
 
 // ---------- intent classification (dataset-aligned) ----------
 
