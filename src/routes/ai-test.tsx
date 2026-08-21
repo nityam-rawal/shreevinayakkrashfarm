@@ -8,6 +8,10 @@ import { seedVerticalCatalog } from "@/lib/business-profile";
 import { parseCommand, type ParsedAction } from "@/lib/nlp";
 import { TRAINING_CORPUS } from "@/lib/training-corpus";
 import { classifyIntentOffline, canonicalIntent } from "@/lib/indic-lexicon";
+import { ADVERSARIAL_CORPUS } from "@/lib/adversarial-corpus";
+import { WHOLE_DAY_CORPUS } from "@/lib/whole-day-corpus";
+import { classifyRisk } from "@/lib/risk-guards";
+import { segmentDay } from "@/lib/day-events";
 import { CheckCircle2, XCircle, Loader2, FlaskConical, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -202,7 +206,62 @@ function runBenchmark(): Bench {
   return { total, pass, byLang, fails };
 }
 
+type Bench2 = { total: number; pass: number; fails: { text: string; expected: string; got: string }[] };
+
+function runRiskBenchmark(): Bench2 {
+  let total = 0, pass = 0;
+  const fails: Bench2["fails"] = [];
+  for (const r of ADVERSARIAL_CORPUS) {
+    total++;
+    const got = classifyRisk(r.text);
+    if (got === r.fc) pass++;
+    else fails.push({ text: r.text, expected: r.fc, got: got ?? "—" });
+  }
+  return { total, pass, fails };
+}
+
+function runWholeDayBenchmark(): Bench2 {
+  let total = 0, pass = 0;
+  const fails: Bench2["fails"] = [];
+  for (const r of WHOLE_DAY_CORPUS) {
+    const got = new Set(segmentDay(r.text).map((e) => e.type as string));
+    for (const ev of r.events) {
+      total++;
+      if (got.has(ev)) pass++;
+      else fails.push({ text: r.text, expected: ev, got: [...got].join(", ") || "—" });
+    }
+  }
+  return { total, pass, fails };
+}
+
+function BenchOut({ b }: { b: Bench2 }) {
+  return (
+    <div className="mt-3 space-y-2 text-xs">
+      <div className="font-bold">
+        Accuracy:{" "}
+        <span className={b.pass === b.total ? "text-success" : "text-warning"}>
+          {b.pass}/{b.total} ({Math.round((100 * b.pass) / b.total)}%)
+        </span>
+      </div>
+      {b.fails.length > 0 && (
+        <details>
+          <summary className="cursor-pointer">{b.fails.length} misses</summary>
+          <ul className="mt-1 space-y-1">
+            {b.fails.slice(0, 40).map((f, i) => (
+              <li key={i} className="text-destructive">
+                "{f.text.slice(0, 90)}" → {f.got} (expected {f.expected})
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function AiTestPage() {
+  const [risk, setRisk] = useState<Bench2 | null>(null);
+  const [day, setDay] = useState<Bench2 | null>(null);
   const [bench, setBench] = useState<Bench | null>(null);
   const [results, setResults] = useState<Result[]>([]);
   const [running, setRunning] = useState(false);
@@ -297,6 +356,30 @@ function AiTestPage() {
               )}
             </div>
           )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h3 className="font-display font-bold">Risk Guard benchmark</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {ADVERSARIAL_CORPUS.length} tricky vendor cases (personal vs business paisa, stock
+            mismatch, audit, tax) — AI ko pata hona chahiye kab sawal poochna hai.
+          </p>
+          <Button size="sm" className="mt-3" variant="outline" onClick={() => setRisk(runRiskBenchmark())}>
+            Run Risk Guard Benchmark
+          </Button>
+          {risk && <BenchOut b={risk} />}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h3 className="font-display font-bold">Whole-day synthesis benchmark</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {WHOLE_DAY_CORPUS.length} pure din ki narration (7 bhasha) — har event (purchase, sale,
+            payment, kharcha, staff advance, personal, reconcile) pakadna zaroori hai.
+          </p>
+          <Button size="sm" className="mt-3" variant="outline" onClick={() => setDay(runWholeDayBenchmark())}>
+            Run Whole-Day Benchmark
+          </Button>
+          {day && <BenchOut b={day} />}
         </div>
 
         {results.length > 0 && (
