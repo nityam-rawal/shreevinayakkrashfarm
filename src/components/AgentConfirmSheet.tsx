@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { fmtINR } from "@/lib/format";
 import { runAll, type PlannedAction, type SynthesisResult } from "@/lib/agent";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, FileText, ArrowDownRight, ArrowUpRight, Wallet, Trash2, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, ArrowDownRight, ArrowUpRight, Wallet, Trash2, Loader2, Sparkles, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { ParsedAction } from "@/lib/nlp";
 
 interface Props {
