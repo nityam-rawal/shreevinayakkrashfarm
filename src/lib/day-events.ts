@@ -34,17 +34,17 @@ interface EventRule { type: DayEventType; pri: number; test: RegExp }
 // Rules run against text that has passed through normalizeIndic(), so Hindi,
 // Gujarati, romanised and code-mixed speech all reduce to canonical tokens.
 const EVENT_RULES: EventRule[] = [
-  { type: "PERSONAL_EXPENSE", pri: 1, test: /\b(ghar(?:e|\s*ke\s*liye)?|home|household|personal|ghar\s*ka)\b[^.]*\b(saman|goods|liya|lidho|kharcha|bought|expense|spend)\b|\bkeep\s*(?:this|it)\s*personal\b|\bpersonal\s*(?:che|hai|rakhna|rakho)\b|\bbusiness\s*expense\s*me\s*mat\b|\boutside\s*business\b/i },
+  { type: "PERSONAL_EXPENSE", pri: 1, test: /\b(ghar(?:e|\s*ke\s*liye)?|home|household|personal|ghar\s*ka)\b[^.]*\b(saman|goods|liya|lidho|lidhu|kharcha|bought|expense|spend)\b|\bkeep\s*(?:this|it)\s*personal\b|\bpersonal\s*(?:che|hai|rakhna|rakho)\b|\bbusiness\s*expense\s*me\s*mat\b|\boutside\s*business\b/i },
   { type: "OWNER_DRAWING", pri: 2, test: /\bowner\b[^.]*\b(took|nikala|le\s*gaya|withdrew)\b|\b(business|shop)\s*cash\b[^.]*\b(ghar|home|family|personal)\b/i },
   { type: "OWNER_CAPITAL", pri: 2, test: /\bowner\b[^.]*\b(put|invest|daala|nakhya|introduc)\b|\bpersonal\s*(money|paisa)\b[^.]*\bbusiness\b/i },
-  { type: "RECONCILIATION", pri: 3, test: /\b(reconcil\w*|milaya|milaye|check\s*kar\w*|tally|match\s*kiy\w*|mila(?:ya|ye)?)\b[^.]*\b(cash|upi|bank)\b|\b(cash|upi)\b[^.]*\b(reconcil\w*|milaya|milaye|check\s*kar\w*|tally)\b|\bclosing\b/i },
+  { type: "RECONCILIATION", pri: 3, test: /\b(reconcil\w*|milaya|milaye|tally|check)\b[^.]*\b(cash|upi|bank)\b|\b(cash|upi)\b[^.]*\b(reconcil\w*|milaya|milaye|tally|check|karo|kiya)\b|\bclosing\b/i },
   { type: "STAFF_ADVANCE", pri: 4, test: /\bstaff\b[^.]*\badvance\b|\badvance\b[^.]*\bstaff\b|\bpagar\s*advance\b/i },
   { type: "STAFF_SALARY", pri: 4, test: /\b(staff|karigar|worker|naukar)\b[^.]*\b(salary|pagar|tankha)\b|\bsalary\b[^.]*\b(diya|paid|chukaya)\b/i },
   { type: "RETURN", pri: 5, test: /\b(wapas|return(?:ed)?|parat)\b/i },
   { type: "ORDER_ONLY", pri: 5, test: /\b(order)\b[^.]*\b(next|kal|agle|future|aane\s*wale)\b|\b(next\s*(week|month|monday|friday))\b[^.]*\border\b/i },
-  { type: "CUSTOMER_RECEIPT", pri: 6, test: /\b(old|purane?|purani|juna|juni|outstanding|baki|bakaya|udhaar)\b[^.]*\b(mila|mile|malya|diya|diye|aaya|received|paid|jama)\b|\b(payment|jama|upi|cash)\b[^.]*\b(mila|mile|malya|received)\b|\bpaid\b[^.]*\bagainst\b/i },
+  { type: "CUSTOMER_RECEIPT", pri: 6, test: /\b(old|purane?|purani|juna|juni|outstanding|baki|bakaya|udhaar)\b[^.]*\b(mila|mile|malya|diya|diye|aaya|received|paid|jama|payment)\b|\b(payment|jama|upi|cash)\b[^.]*\b(mila|mile|malya|received)\b|\b(paid|payment|mila)\b[^.]*\bagainst\b|\bagainst\b[^.]*\b(old|purana|outstanding|udhaar)\b/i },
   { type: "SUPPLIER_PAYMENT", pri: 6, test: /\b(supplier|traders|agency|distributors|wholesaler)\b[^.]*\b(payment|paid|chukaya|diya)\b|\bpaid\b[^.]*\b(supplier|traders|agency|distributors)\b/i },
-  { type: "BUSINESS_EXPENSE", pri: 7, test: /\b(kharcha|expense|rent|gas|diesel|petrol|bijli|electricity|courier|repair|packing|chai|labour|transport|salary)\b/i },
+  { type: "BUSINESS_EXPENSE", pri: 7, test: /\b(kharcha|expense|rent|gas|diesel|petrol|bijli|electricity|courier|repair|packing|chai|labour|transport|salary|fuel|maintenance)\b|\bbusiness\b[^.]*\b(cost|bill|paid)\b/i },
   { type: "PURCHASE_RECEIPT", pri: 8, test: /\b(se|pase\s*thi|from)\b[^.]*\b(aaya|aaye|aavya|aa\s*gaya|mila|received|delivered|kharida|purchase[ds]?)\b|\bdelivered\b|\b(kharida|purchase[ds]?)\b/i },
   { type: "SALE", pri: 9, test: /\b(bechi|bech|sold|sell|sale|diya|diye|aapya|bheja|supply)\b/i },
 ];
