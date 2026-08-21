@@ -5,6 +5,8 @@
 import { db, nextInvoiceNumber, adjustStockForLines } from "./db";
 import { parseCommand, type ParsedAction } from "./nlp";
 import { todayISO } from "./format";
+import { detectRisks, type RiskFlag } from "./risk-guards";
+import { segmentDay, EVENT_LABELS, type DayEvent } from "./day-events";
 
 export type ActionStatus = "auto" | "needs-review";
 
@@ -30,6 +32,12 @@ export interface DayTotals {
 
 export interface SynthesisResult {
   planned: PlannedAction[];
+  /** business-safety warnings ("ye personal hai, sale nahi?") */
+  risks: RiskFlag[];
+  /** sentences understood but intentionally NOT posted to the books */
+  excluded: { sentence: string; label: string }[];
+  /** every event detected in the narration, for the day summary */
+  events: DayEvent[];
   answers: string[];             // read-only Q results kept separate
   unmatched: string[];
   totals: DayTotals;
@@ -114,7 +122,25 @@ export async function synthesizeDay(text: string): Promise<SynthesisResult> {
     expenses: planned.filter((p) => p.action.action === "add_cash" && p.action.data.type === "expense"),
     incomes: planned.filter((p) => p.action.action === "add_cash" && p.action.data.type === "income"),
   };
-  return { planned, answers, unmatched: res.unmatched, totals: totalsFor(planned), groups };
+  const events = segmentDay(text);
+  const excluded = events
+    .filter((e) => e.excludeFromBusiness)
+    .map((e) => ({ sentence: e.sentence, label: EVENT_LABELS[e.type] }));
+  // Anything intentionally excluded should not also be reported as "not understood".
+  const excludedNorm = new Set(excluded.map((e) => e.sentence.toLowerCase().replace(/\s+/g, " ").trim()));
+  const unmatched = res.unmatched.filter(
+    (u) => !excludedNorm.has(u.toLowerCase().replace(/\s+/g, " ").trim()),
+  );
+  return {
+    planned,
+    risks: detectRisks(text),
+    excluded,
+    events,
+    answers,
+    unmatched,
+    totals: totalsFor(planned),
+    groups,
+  };
 }
 
 // ---------- Tool executors (atomic per action) ----------
