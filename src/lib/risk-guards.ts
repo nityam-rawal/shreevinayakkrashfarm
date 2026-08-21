@@ -12,6 +12,8 @@ export interface RiskRule {
   /** failure class id from the training taxonomy */
   fc: string;
   severity: RiskSeverity;
+  /** lower runs first; defaults to array order bucket 100 */
+  pri?: number;
   /** short Hinglish label shown as a chip */
   label: string;
   /** the one question the AI should ask before posting */
@@ -35,7 +37,7 @@ export const RISK_RULES: RiskRule[] = [
     test: /\bwrite[-\s]?off\b|\bapproval\b[^.]*\brequired\b/i },
   { fc: "concurrency", severity: "ask", label: "Double posting", ask: "Do users ne same entry daali lagti hai — ek hi rakhein?",
     test: /\b(two|2)\b[^.]*\b(users?|staff|phones?)\b[^.]*\bsame\b|\bconcurrent/i },
-  { fc: "offline_sync", severity: "ask", label: "Sync duplicate", ask: "Offline sync se same entry do baar aayi — duplicate hata dein?",
+  { fc: "offline_sync", pri: 10, severity: "ask", label: "Sync duplicate", ask: "Offline sync se same entry do baar aayi — duplicate hata dein?",
     test: /\boffline\b[^.]*\b(sync|synchroni)/i },
 
   // ---- duplicates ----
@@ -65,9 +67,9 @@ export const RISK_RULES: RiskRule[] = [
     test: /\bopening\b[^.]*\b(cash|balance|stock)\b/i },
   { fc: "customer_advance", severity: "ask", label: "Customer advance", ask: "Ye advance hai, sale nahi — advance me rakhein?",
     test: /\b(customer|he|she|[A-Z][a-z]+)\b[^.]*\bgave\b[^.]*\badvance\b|\badvance\b[^.]*\b(for|order|next)\b|\bpeshgi\b/i },
-  { fc: "supplier_advance", severity: "ask", label: "Supplier advance", ask: "Supplier ko advance diya — purchase baad me aayega. Advance maane?",
+  { fc: "supplier_advance", pri: 10, severity: "ask", label: "Supplier advance", ask: "Supplier ko advance diya — purchase baad me aayega. Advance maane?",
     test: /\bpaid\b[^.]*\badvance\b|\badvance\b[^.]*\b(supplier|goods\s*will)\b/i },
-  { fc: "staff_ambiguity", severity: "ask", label: "Staff paisa", ask: "Staff ko diya paisa — salary, advance ya loan?",
+  { fc: "staff_ambiguity", pri: 10, severity: "ask", label: "Staff paisa", ask: "Staff ko diya paisa — salary, advance ya loan?",
     test: /\bstaff\b[^.]*\b(advance|salary|loan|bonus|reimburse)\b|\bunclear\b[^.]*\b(salary|advance|loan)\b/i },
   { fc: "old_receivable", severity: "ask", label: "Purana udhaar", ask: "Ye purane udhaar ki vasooli hai — nayi sale na banaye?",
     test: /\b(old|last\s*month'?s|previous|purana|purani)\b[^.]*\b(outstanding|balance|invoice|udhaar|bakaya)\b|\bno\s*new\s*sale\b|\bagainst\b[^.]*\b(old|outstanding|invoice)\b/i },
@@ -79,7 +81,7 @@ export const RISK_RULES: RiskRule[] = [
     test: /\bupi\b[^.]*\b(settle|settlement|fee|later)\b|\bsettlement\b[^.]*\bbank\b/i },
   { fc: "cash_reconciliation", severity: "ask", label: "Cash mismatch", ask: "Ledger cash aur physical cash alag hai — kaun sa sahi maane?",
     test: /\b(ledger|book|system)\b[^.]*\bcash\b[^.]*\b(physical|actual|ginti)\b|\bphysical\s*cash\b[^.]*\b(differ|but|hai)\b|\breconcil\w*\b[^.]*\bcash\b/i },
-  { fc: "closing", severity: "note", label: "Day closing", ask: "Books band karne se pehle cash, stock aur udhaar reconcile karein.",
+  { fc: "closing", pri: 10, severity: "note", label: "Day closing", ask: "Books band karne se pehle cash, stock aur udhaar reconcile karein.",
     test: /\bclose\b[^.]*\bbooks?\b|\bday\s*closing\b|\bdin\s*band\b|\bclosing\b[^.]*\breconcil/i },
 
   // ---- stock / SKU ----
@@ -89,11 +91,11 @@ export const RISK_RULES: RiskRule[] = [
     test: /\b(missing|lower|kam)\b[^.]*\bstock\b[^.]*\b(investigat|not\b[^.]*sale)|\bshrinkage\b/i },
   { fc: "physical_vs_system_stock", severity: "ask", label: "Ginti mismatch", ask: "App ka stock aur physical count alag hai — adjustment karein?",
     test: /\b(app|system)\b[^.]*\b(shows?|stock)\b[^.]*\bphysical\b|\bphysical\s*(count|stock)\b[^.]*\b(differ|is)\b/i },
-  { fc: "reserved_stock", severity: "note", label: "Reserved stock", ask: "Kuch stock reserved hai — available quantity kam hai.",
+  { fc: "reserved_stock", pri: 10, severity: "note", label: "Reserved stock", ask: "Kuch stock reserved hai — available quantity kam hai.",
     test: /\breserved\b/i },
   { fc: "location_stock", severity: "ask", label: "Godown transfer", ask: "Warehouse se shop bheja — ye purchase nahi, transfer hai. Transfer maane?",
     test: /\b(warehouse|godown)\b[^.]*\b(to|se)\b[^.]*\b(shop|branch)\b|\bnot\s*a\s*purchase\b/i },
-  { fc: "warehouse_transfer", severity: "ask", label: "Stock transfer", ask: "Ye stock transfer hai — sale/purchase na banaye?",
+  { fc: "warehouse_transfer", pri: 10, severity: "ask", label: "Stock transfer", ask: "Ye stock transfer hai — sale/purchase na banaye?",
     test: /\b(sent|moved)\b[^.]*\bfrom\b[^.]*\b(warehouse|godown|branch)\b|\bstock\s*transfer\b/i },
   { fc: "branch", severity: "note", label: "Branch stock", ask: "Do dukan ka stock alag hai — kaun si branch?",
     test: /\b(shop|branch|store)\s*[ab1-9]\b[^.]*\b(separate|alag|other)\b|\bbranch\b[^.]*\bseparate\s*stock\b/i },
@@ -105,25 +107,25 @@ export const RISK_RULES: RiskRule[] = [
     test: /\bjob\s*work(?:er)?\b|\bsubcontract/i },
   { fc: "production", severity: "ask", label: "Production", ask: "Raw material use aur finished output alag likhein?",
     test: /\b(used|consumed)\b[^.]*\b(kg|units?)\b[^.]*\bproduce\b|\bproduction\b|\bfinished\s*(units?|goods)\b/i },
-  { fc: "bom", severity: "note", label: "BOM", ask: "BOM quantity app ki settings se lein — guess na karein.",
+  { fc: "bom", pri: 10, severity: "note", label: "BOM", ask: "BOM quantity app ki settings se lein — guess na karein.",
     test: /\bbom\b|\bbill\s*of\s*material/i },
   { fc: "damage", severity: "ask", label: "Damaged maal", ask: "Kitna maal damaged hai? Wo alag rakhein.",
     test: /\bdamag\w*\b|\bkharab\b|\btut(?:a|e|i)\b/i },
   { fc: "expiry", severity: "ask", label: "Expiry", ask: "Expiry wale batch alag handle karein — sale na karein?",
     test: /\bexpir\w*\b/i },
-  { fc: "batch", severity: "note", label: "Batch", ask: "Same item ke 2 batch hain — kaun sa batch?",
+  { fc: "batch", pri: 10, severity: "note", label: "Batch", ask: "Same item ke 2 batch hain — kaun sa batch?",
     test: /\bbatch(?:es)?\b/i },
   { fc: "serial", severity: "note", label: "Serial no.", ask: "Serial number wala item hai — actual serial likhein.",
     test: /\bserial\b|\bimei\b/i },
-  { fc: "waste", severity: "ask", label: "Waste", ask: "Ye waste/spoil hai, sale nahi — waste me daalein?",
+  { fc: "waste", pri: 10, severity: "ask", label: "Waste", ask: "Ye waste/spoil hai, sale nahi — waste me daalein?",
     test: /\b(spoiled|spoilage|waste|wastage|kharab\s*ho\s*gaya)\b/i },
   { fc: "free_sample", severity: "ask", label: "Free sample", ask: "Free sample diya — stock kam hoga, sale nahi. Theek?",
     test: /\bfree\b[^.]*\bsample|\bsample[s]?\b[^.]*\bfree\b|\bmuft\b/i },
   { fc: "promotional", severity: "ask", label: "Promotion", ask: "Promotion me diya — normal sale na banaye?",
     test: /\bpromotion\w*\b|\bscheme\s*me\b/i },
-  { fc: "free_quantity", severity: "note", label: "Free quantity", ask: "Free quantity mili — physical stock zyada hoga.",
-    test: /\b(1|one|\d+)\b[^.]*\bfree\b[^.]*\b(received|mila|extra)\b|\bfree\s*(quantity|qty)\b|\bbuy\b[^.]*\bget\b[^.]*\bfree\b/i },
-  { fc: "owner_stock_use", severity: "ask", label: "Ghar ke liye maal", ask: "Ghar ke liye maal liya — sale nahi, owner use maane?",
+  { fc: "free_quantity", pri: 10, severity: "note", label: "Free quantity", ask: "Free quantity mili — physical stock zyada hoga.",
+    test: /\b(received|mila|extra|got)\s*\d+\s*free\b|\bfree\s*(quantity|qty)\b|\bbuy\b[^.]*\bget\b[^.]*\bfree\b/i },
+  { fc: "owner_stock_use", pri: 10, severity: "ask", label: "Ghar ke liye maal", ask: "Ghar ke liye maal liya — sale nahi, owner use maane?",
     test: /\b(took|liya|lidhu)\b[^.]*\b(stock|shop)\b[^.]*\b(home|ghar|personal)\b|\bhome\s*use\b/i },
   { fc: "unit_conversion", severity: "ask", label: "Unit convert", ask: "Carton/box ka conversion app settings se lein — confirm karein?",
     test: /\b(carton|box|dozen|bori|bag|packet)\b[^.]*\bconversion\b|\bconvert\w*\b[^.]*\b(unit|piece|kg)\b/i },
@@ -151,15 +153,15 @@ export const RISK_RULES: RiskRule[] = [
     test: /\bgst\b|\btax\s*(rate|config)/i },
   { fc: "rounding", severity: "note", label: "Rounding", ask: "Rounding app ke rule se hoga.",
     test: /\brounding\b|\bround\s*off\b/i },
-  { fc: "credit_note", severity: "ask", label: "Credit note", ask: "Final bill me badlav — credit note banayein?",
-    test: /\bcredit\s*note\b/i },
+  { fc: "credit_note", pri: 10, severity: "ask", label: "Credit note", ask: "Final bill me badlav — credit note banayein?",
+    test: /\bcredit[-\s]note\b/i },
   { fc: "debit_note", severity: "note", label: "Debit note", ask: "Debit note document event hai, sirf payment nahi.",
     test: /\bdebit\s*note\b/i },
   { fc: "discount", severity: "note", label: "Discount", ask: "Gross, discount aur net alag rakhein.",
     test: /\bdiscount\b|\bchhoot\b/i },
   { fc: "currency", severity: "ask", label: "Foreign currency", ask: "Ye foreign currency hai — INR me na maane. Rate batayein?",
     test: /\b(usd|eur|gbp|aed|dollar|euro)\b/i },
-  { fc: "fx", severity: "note", label: "FX settlement", ask: "Foreign invoice aur INR settlement dono track honge.",
+  { fc: "fx", pri: 10, severity: "note", label: "FX settlement", ask: "Foreign invoice aur INR settlement dono track honge.",
     test: /\b(exchange\s*rate|forex|fx)\b/i },
   { fc: "cost_basis", severity: "note", label: "Cost basis", ask: "Valuation policy app se — purchase rate alag alag hai.",
     test: /\b(valuation|cost\s*basis|bought\s*at)\b/i },
@@ -171,13 +173,13 @@ export const RISK_RULES: RiskRule[] = [
     test: /\b(next\s*(week|month|friday|monday)|kal\s*ka\s*order|future\s*order|advance\s*order)\b|\border\b[^.]*\bfor\b[^.]*\bnext\b/i },
   { fc: "purchase_state", severity: "ask", label: "Purchase adhoora", ask: "Order aur delivery quantity alag hai — kitna receive hua?",
     test: /\bordered\b[^.]*\b(only|arrived|received)\b|\bsupplier\s*invoice\s*says\b/i },
-  { fc: "sale_state", severity: "ask", label: "Sale adhoori", ask: "Poora order deliver nahi hua — kitna bill karein?",
+  { fc: "sale_state", pri: 10, severity: "ask", label: "Sale adhoori", ask: "Poora order deliver nahi hua — kitna bill karein?",
     test: /\bordered\b[^.]*\bdeliver/i },
-  { fc: "quantity_mismatch", severity: "ask", label: "Qty mismatch", ask: "Invoice qty aur receive qty alag hai — kaun sa likhein?",
+  { fc: "quantity_mismatch", pri: 10, severity: "ask", label: "Qty mismatch", ask: "Invoice qty aur receive qty alag hai — kaun sa likhein?",
     test: /\binvoice\b[^.]*\b(says|qty|quantity)\b[^.]*\b(only|but|physically)\b|\bquantity\s*mismatch\b/i },
-  { fc: "wrong_item", severity: "ask", label: "Galat item", ask: "Invoice ka item aur aaya item alag hai — kaun sa likhein?",
+  { fc: "wrong_item", pri: 10, severity: "ask", label: "Galat item", ask: "Invoice ka item aur aaya item alag hai — kaun sa likhein?",
     test: /\binvoice\s*says\b[^.]*\bbut\b[^.]*\breceived\b|\bwrong\s*item\b|\bdifferent\s*item\b/i },
-  { fc: "partial_return", severity: "ask", label: "Partial return", ask: "Thoda maal wapas aaya — poora bill cancel na karein?",
+  { fc: "partial_return", pri: 10, severity: "ask", label: "Partial return", ask: "Thoda maal wapas aaya — poora bill cancel na karein?",
     test: /\breturn\w*\b[^.]*\b(do\s*not\s*cancel|partial|thoda)\b|\boriginal\s*invoice\b[^.]*\breturn/i },
   { fc: "customer_return", severity: "ask", label: "Sales return", ask: "Customer ne wapas kiya — sales return likhein?",
     test: /\b(customer|[A-Z][a-z]+)\b[^.]*\breturned\b|\breturn\w*\b[^.]*\b(sale|customer)\b|\bwapas\s*(kiya|aaya)\b/i },
@@ -201,13 +203,13 @@ export const RISK_RULES: RiskRule[] = [
     test: /\btimezone\b|\basia\/kolkata\b/i },
   { fc: "party_role", severity: "ask", label: "Party role", ask: "Ye party customer bhi hai supplier bhi — is entry me kaun?",
     test: /\bboth\b[^.]*\b(supplier|customer)\b[^.]*\b(customer|supplier)\b|\bparty\s*role\b/i },
-  { fc: "multilingual", severity: "note", label: "Multi-language", ask: "Ek hi baat kai bhasha me — same concept maana gaya.",
+  { fc: "multilingual", pri: 10, severity: "note", label: "Multi-language", ask: "Ek hi baat kai bhasha me — same concept maana gaya.",
     test: /\bcan\s*describe\s*the\s*same\b|\bsame\b[^.]*\bconcept\b/i },
   { fc: "code_mixing", severity: "note", label: "Mixed bhasha", ask: "Mixed bhasha samajh li — confirm karein.",
-    test: /\bcode[-\s]?mix/i },
+    test: /\bcode[-\s]?mix|\bpase\s*thi\b|\baavyo\b[^.]*\band\b/i },
   { fc: "colloquial", severity: "ask", label: "Matlab pakka nahi", ask: "Iska matlab sale, transfer ya dispatch — kaun sa?",
     test: /\bcould\s*mean\b|\bmatlab\b[^.]*\b(kya|pakka)\b|\bnikli\s*gayo\b/i },
-  { fc: "correction", severity: "ask", label: "Correction", ask: "Purani entry badalni hai — history rakh ke correction karein?",
+  { fc: "correction", pri: 10, severity: "ask", label: "Correction", ask: "Purani entry badalni hai — history rakh ke correction karein?",
     test: /\bchange\b[^.]*\b(yesterday'?s|₹?\d+)\b[^.]*\bto\b|\bcorrect\w*\b[^.]*\b(entry|expense|amount)\b|\bgalat\b/i },
   { fc: "unknown", severity: "ask", label: "Info kam", ask: "Amount/category clear nahi — detail batayein?",
     test: /\bsome\s*money\b|\bwithout\s*(amount|category|purpose)\b|\binsufficient\b/i },
@@ -222,6 +224,8 @@ export interface RiskFlag {
   snippet: string;
 }
 
+const ORDERED_RULES = [...RISK_RULES].sort((a, b) => (a.pri ?? 100) - (b.pri ?? 100));
+
 const SENTENCE_SPLIT = /(?<=[.;।|])\s+|\n+/;
 
 /** All risks found in a whole-day narration, de-duplicated by failure class. */
@@ -230,7 +234,7 @@ export function detectRisks(text: string, limit = 6): RiskFlag[] {
   const seen = new Set<string>();
   const parts = text.split(SENTENCE_SPLIT).filter((s) => s.trim().length > 2);
   for (const part of parts.length ? parts : [text]) {
-    for (const r of RISK_RULES) {
+    for (const r of ORDERED_RULES) {
       if (seen.has(r.fc)) continue;
       if (!r.test.test(part)) continue;
       seen.add(r.fc);
@@ -243,6 +247,6 @@ export function detectRisks(text: string, limit = 6): RiskFlag[] {
 
 /** Single best-guess failure class (used by the offline benchmark). */
 export function classifyRisk(text: string): string | null {
-  for (const r of RISK_RULES) if (r.test.test(text)) return r.fc;
+  for (const r of ORDERED_RULES) if (r.test.test(text)) return r.fc;
   return null;
 }
