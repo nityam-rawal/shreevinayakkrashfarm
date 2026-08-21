@@ -6,6 +6,8 @@
 //
 // 100% offline: ordered regex rules, no model, no network.
 
+import { normalizeIndic } from "./indic-lexicon";
+
 export type RiskSeverity = "block" | "ask" | "note";
 
 export interface RiskRule {
@@ -234,9 +236,10 @@ export function detectRisks(text: string, limit = 6): RiskFlag[] {
   const seen = new Set<string>();
   const parts = text.split(SENTENCE_SPLIT).filter((s) => s.trim().length > 2);
   for (const part of parts.length ? parts : [text]) {
+    const norm = normalizeIndic(part);
     for (const r of ORDERED_RULES) {
       if (seen.has(r.fc)) continue;
-      if (!r.test.test(part)) continue;
+      if (!r.test.test(part) && !r.test.test(norm)) continue;
       seen.add(r.fc);
       out.push({ fc: r.fc, severity: r.severity, label: r.label, ask: r.ask, snippet: part.trim().slice(0, 120) });
     }
