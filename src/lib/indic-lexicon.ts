@@ -77,6 +77,19 @@ export const INDIC_NORMALIZERS: [RegExp, string][] = [
   [/प्लेट/g, " plate "], [/स्ट्रिप/g, " strip "], [/चीज(?:ें|े)?|वस्तु(?:एं)?/g, " item "],
   [/कम(?=\s|$)/g, " kam "], [/क्यों/g, " kyu "], [/था|थी/g, " tha "], [/इस्तेमाल|इस्तमाल/g, " use "],
   [/ग्राहक/g, " customer "], [/सप्लायर|विक्रेता/g, " supplier "], [/के\s*रूप\s*में/g, " as "],
+  // ---- whole-day narration additions ----
+  [/આવ્યા|આવ્યો|આવ્યું|આવી(?!\s*ગય)/g, " aa gaya "], [/आए|आया|आयी|आईं/g, " aa gaya "],
+  [/મળ્યા|મળ્યું|મળી/g, " mila "], [/मिल(?:े|ा|ी|ीं)/g, " mila "],
+  [/पुरान(?:े|ा|ी)|पिछले/g, " purana "], [/જૂન(?:ા|ી|ો|ું)/g, " purana "],
+  [/घर(?:े|वाले)?/g, " ghar "], [/ઘર(?:ે)?/g, " ghar "],
+  [/सामान/g, " saman "], [/સામાન/g, " saman "],
+  [/लिय(?:ा|े)|ली(?=\s|$)/g, " liya "],
+  [/मिलाय(?:ा|े)|मिलान/g, " milaya "], [/મેળવ(?:્યા|્યું)|મેળવણી/g, " milaya "],
+  [/ચેક/g, " check "], [/ચકાસ(?:ો|્યું)/g, " check "],
+  [/દુકાન/g, " shop "], [/दुकान/g, " shop "],
+  [/સવારે/g, " subah "], [/सुबह/g, " subah "], [/સાંજે|शाम/g, " shaam "],
+  [/બપોરે|दोपहर/g, " dopahar "], [/ખોલ(?:્યો|્યું|ી)/g, " open "], [/खोल(?:ा|ी)/g, " open "],
+  [/બાકી\s*સામે|बकाये\s*के\s*बदले|बाकी\s*के\s*बदले/g, " purana udhaar ke against "],
 ];
 
 /** Romanised unit / item synonyms → canonical catalog wording. */
