@@ -45,8 +45,8 @@ const EVENT_RULES: EventRule[] = [
   { type: "CUSTOMER_RECEIPT", pri: 6, test: /\b(old|purane?|purani|juna|juni|outstanding|baki|bakaya|udhaar)\b[^.]*\b(mila|mile|malya|diya|diye|aaya|received|paid|jama|payment)\b|\b(payment|jama|upi|cash)\b[^.]*\b(mila|mile|malya|received)\b|\b(paid|payment|mila)\b[^.]*\bagainst\b|\bagainst\b[^.]*\b(old|purana|outstanding|udhaar)\b/i },
   { type: "SUPPLIER_PAYMENT", pri: 6, test: /\b(supplier|traders|agency|distributors|wholesaler)\b[^.]*\b(payment|paid|chukaya|diya)\b|\bpaid\b[^.]*\b(supplier|traders|agency|distributors)\b/i },
   { type: "BUSINESS_EXPENSE", pri: 7, test: /\b(kharcha|expense|rent|gas|diesel|petrol|bijli|electricity|courier|repair|packing|chai|labour|transport|salary|fuel|maintenance)\b|\bbusiness\b[^.]*\b(cost|bill|paid)\b/i },
-  { type: "PURCHASE_RECEIPT", pri: 8, test: /\b(se|pase\s*thi|from)\b[^.]*\b(aaya|aaye|aavya|aa\s*gaya|mila|received|delivered|kharida|purchase[ds]?)\b|\bdelivered\b|\b(kharida|purchase[ds]?)\b/i },
-  { type: "SALE", pri: 9, test: /\b(bechi|bech|sold|sell|sale|diya|diye|aapya|bheja|supply)\b/i },
+  { type: "PURCHASE_RECEIPT", pri: 6.5, test: /\b(se|pase\s*thi|from)\b[^.]*\b(aaya|aaye|aavya|aa\s*gaya|mila|received|delivered|kharida|purchase[ds]?)\b|\bdelivered\b|\b(kharida|purchase[ds]?)\b/i },
+  { type: "SALE", pri: 6.6, test: /\b(bechi|bech|sold|sell|sale|diya|diye|aapya|bheja|supply)\b/i },
 ];
 
 const ORDERED = [...EVENT_RULES].sort((a, b) => a.pri - b.pri);
