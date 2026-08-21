@@ -75,7 +75,56 @@ export function AgentConfirmSheet({ open, onOpenChange, result, onDone }: Props)
         </SheetHeader>
 
         <div className="space-y-4 p-4 pb-32">
+          {/* RISK GUARD — business samajh warnings before anything is posted */}
+          {result?.risks?.length ? (
+            <div className="rounded-2xl border border-warning/50 bg-warning/5 p-3">
+              <div className="flex items-center gap-1.5 text-sm font-bold text-warning">
+                <ShieldAlert className="h-4 w-4" /> Pehle ye confirm karo
+              </div>
+              <ul className="mt-2 space-y-2">
+                {result.risks.map((r) => (
+                  <li key={r.fc} className="rounded-xl border border-border/60 bg-card p-2">
+                    <div className="flex items-center gap-1.5">
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] ${
+                          r.severity === "block"
+                            ? "border-destructive/50 text-destructive"
+                            : r.severity === "ask"
+                              ? "border-warning/50 text-warning"
+                              : "border-border text-muted-foreground"
+                        }`}
+                      >
+                        {r.severity === "block" ? "Ruko" : r.severity === "ask" ? "Pucho" : "Dhyan"}
+                      </Badge>
+                      <span className="text-xs font-semibold">{r.label}</span>
+                    </div>
+                    <div className="mt-1 text-xs">{r.ask}</div>
+                    <div className="mt-0.5 truncate text-[10px] text-muted-foreground">"{r.snippet}"</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Intentionally kept out of the books */}
+          {result?.excluded?.length ? (
+            <div className="rounded-2xl border border-border bg-muted/30 p-3 text-xs">
+              <div className="flex items-center gap-1.5 font-bold">
+                <ShieldCheck className="h-4 w-4 text-success" /> Books se bahar rakha
+              </div>
+              <ul className="mt-1.5 space-y-1">
+                {result.excluded.map((e, i) => (
+                  <li key={i} className="text-muted-foreground">
+                    <span className="font-semibold text-foreground">{e.label}</span> — {e.sentence}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           {/* INVOICES */}
+
           {groups.invoices.length > 0 && (
             <GroupCard icon={<FileText className="h-4 w-4" />} title="Bills" total={groups.invoices.reduce((s, p) => s + (p.action.action === "create_invoice" ? p.action.data.lines.reduce((x, l) => x + l.qty * l.rate, 0) : 0), 0)}>
               {groups.invoices.map((p) => {
